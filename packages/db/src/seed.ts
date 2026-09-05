@@ -30,7 +30,7 @@ const seedItems = [
 ];
 
 const databaseUrl =
-  process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/cs_skin_tracker";
+  process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:5433/cs_skin_tracker";
 
 const client = postgres(databaseUrl, { prepare: false });
 const db = drizzle(client);

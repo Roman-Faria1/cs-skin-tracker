@@ -24,6 +24,9 @@ Professional-grade personal dashboard for tracking CS2 skin prices, trends, and 
 The worker is scaffolded for later scheduled sync work and can be started separately with
 `corepack pnpm dev:worker` once Redis-backed jobs are wired into persistence.
 
+Local Docker Postgres publishes on host port `5433` to avoid colliding with an existing
+machine-level Postgres on `5432`.
+
 ## CS2Cap Rollout Notes
 
 - Free tier supports live prices and item catalog, so the MVP uses `GET /prices`.

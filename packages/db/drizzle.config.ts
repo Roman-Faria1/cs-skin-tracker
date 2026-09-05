@@ -5,6 +5,6 @@ export default defineConfig({
   schema: "./src/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/cs_skin_tracker"
+    url: process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:5433/cs_skin_tracker"
   }
 });

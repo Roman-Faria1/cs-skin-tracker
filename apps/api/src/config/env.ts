@@ -6,7 +6,7 @@ const apiEnvSchema = z.object({
   DATABASE_URL: z
     .string()
     .url()
-    .default("postgresql://postgres:postgres@localhost:5432/cs_skin_tracker"),
+    .default("postgresql://postgres:postgres@127.0.0.1:5433/cs_skin_tracker"),
   CS2CAP_API_KEY: z.string().min(1).default("replace_me"),
   CS2CAP_BASE_URL: z.string().url().default("https://api.cs2c.app"),
   CS2CAP_MONTHLY_REQUEST_LIMIT: z.coerce.number().int().positive().default(1000),
