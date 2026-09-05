@@ -1,0 +1,36 @@
+{
+  "name": "cs-skin-tracker",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "corepack pnpm -r build",
+    "dev": "corepack pnpm --parallel --filter @csst/api --filter @csst/web dev",
+    "dev:api": "corepack pnpm --filter @csst/api dev",
+    "dev:web": "corepack pnpm --filter @csst/web dev",
+    "dev:worker": "corepack pnpm --filter @csst/worker dev",
+    "typecheck": "corepack pnpm -r typecheck",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "corepack pnpm --filter @csst/db db:generate",
+    "db:migrate": "corepack pnpm --filter @csst/db db:migrate",
+    "db:seed": "corepack pnpm --filter @csst/db db:seed",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.2",
+    "vitest": "^2.1.8"
+  }
+}
