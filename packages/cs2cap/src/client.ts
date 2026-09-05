@@ -30,7 +30,7 @@ export class Cs2CapClient {
   }
 
   async listPrices(request: ListPricesRequest): Promise<ListPricesResult> {
-    const url = new URL(`${this.baseUrl}/prices`);
+    const url = new URL(`${this.baseUrl}/v1/prices`);
     url.searchParams.set("market_hash_name", request.marketHashName);
     url.searchParams.set("currency", request.currency ?? "USD");
 
@@ -63,7 +63,7 @@ export class Cs2CapClient {
   }
 
   async getBatchPrices(request: BatchPriceRequest): Promise<BatchPriceResult> {
-    const response = await this.fetchImpl(`${this.baseUrl}/prices/batch`, {
+    const response = await this.fetchImpl(`${this.baseUrl}/v1/prices/batch`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.options.apiKey}`,

@@ -1,4 +1,9 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
 import { z } from "zod";
+
+loadDotEnv();
 
 const apiEnvSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
@@ -33,4 +38,51 @@ export function loadApiEnv() {
     cs2capMonthlyRequestLimit: parsed.CS2CAP_MONTHLY_REQUEST_LIMIT,
     cs2capDefaultProviders: parsed.CS2CAP_DEFAULT_PROVIDERS
   };
+}
+
+function loadDotEnv(): void {
+  const envPath = findDotEnv(process.cwd());
+  if (envPath === null) {
+    return;
+  }
+
+  const contents = readFileSync(envPath, "utf8");
+  for (const line of contents.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed
+      .slice(separatorIndex + 1)
+      .trim()
+      .replace(/^["']|["']$/g, "");
+
+    process.env[key] ??= value;
+  }
+}
+
+function findDotEnv(startDirectory: string): string | null {
+  let directory = startDirectory;
+
+  while (true) {
+    const envPath = join(directory, ".env");
+    if (!existsSync(envPath)) {
+      const parentDirectory = dirname(directory);
+      if (parentDirectory === directory) {
+        return null;
+      }
+
+      directory = parentDirectory;
+      continue;
+    }
+
+    return envPath;
+  }
 }
