@@ -1,5 +1,10 @@
-import { watchlistSchema } from "@csst/shared";
-import type { AddWatchlistItemRequest, RefreshWatchlistResponse, Watchlist } from "@csst/shared";
+import { itemHistorySchema, watchlistSchema } from "@csst/shared";
+import type {
+  AddWatchlistItemRequest,
+  ItemHistory,
+  RefreshWatchlistResponse,
+  Watchlist
+} from "@csst/shared";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
@@ -13,6 +18,18 @@ export async function fetchWatchlist(): Promise<Watchlist> {
   }
 
   return watchlistSchema.parse(await response.json());
+}
+
+export async function fetchItemHistory(itemId: string): Promise<ItemHistory> {
+  const response = await fetch(`${apiBaseUrl}/watchlists/default/items/${itemId}/history`, {
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch item history: ${response.status}`);
+  }
+
+  return itemHistorySchema.parse(await response.json());
 }
 
 export async function addWatchlistItem(request: AddWatchlistItemRequest): Promise<void> {

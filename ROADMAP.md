@@ -18,7 +18,7 @@
 - [x] Starter frontend watchlist UI.
 - [x] Persist real watchlist mutations through API service.
 - [x] Wire CS2Cap live responses into snapshot persistence.
-- [ ] Add item detail chart from stored snapshots.
+- [x] Add item detail chart from stored snapshots.
 - [x] Add seed command for 10-25 common skins.
 - [ ] Add paid-tier batch lookup path only after explicit Starter+ plan config.
 

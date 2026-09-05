@@ -159,6 +159,9 @@ export function WatchlistDashboard() {
                     </td>
                     <td className="muted">{newest?.collectedAt ?? "Not refreshed"}</td>
                     <td>
+                      <a className="button secondary compact" href={`/items/${entry.item.id}`}>
+                        View
+                      </a>
                       <button
                         className="button danger"
                         disabled={isBusy}

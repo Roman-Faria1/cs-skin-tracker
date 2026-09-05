@@ -17,6 +17,10 @@ export class WatchlistsService {
     return this.repository.getDefaultWatchlist();
   }
 
+  getItemHistory(itemId: string) {
+    return this.repository.getItemHistory(itemId);
+  }
+
   addItem(marketHashName: string): Promise<WatchlistItem> {
     return this.repository.addItem(marketHashName);
   }

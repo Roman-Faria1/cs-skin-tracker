@@ -45,6 +45,11 @@ export const watchlistSchema = z.object({
   items: z.array(watchlistItemSchema)
 });
 
+export const itemHistorySchema = z.object({
+  item: itemSchema,
+  snapshots: z.array(priceSnapshotSchema)
+});
+
 export const addWatchlistItemRequestSchema = z.object({
   marketHashName: marketHashNameSchema
 });
@@ -64,6 +69,7 @@ export type Item = z.infer<typeof itemSchema>;
 export type PriceSnapshot = z.infer<typeof priceSnapshotSchema>;
 export type Watchlist = z.infer<typeof watchlistSchema>;
 export type WatchlistItem = z.infer<typeof watchlistItemSchema>;
+export type ItemHistory = z.infer<typeof itemHistorySchema>;
 export type AddWatchlistItemRequest = z.infer<typeof addWatchlistItemRequestSchema>;
 export type RefreshWatchlistRequest = z.infer<typeof refreshWatchlistRequestSchema>;
 export type RefreshWatchlistResponse = z.infer<typeof refreshWatchlistResponseSchema>;

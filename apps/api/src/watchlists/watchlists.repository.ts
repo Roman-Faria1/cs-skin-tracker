@@ -8,8 +8,8 @@ import {
   watchlists
 } from "@csst/db";
 import type { Database } from "@csst/db";
-import type { PriceSnapshot, Watchlist, WatchlistItem } from "@csst/shared";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import type { ItemHistory, PriceSnapshot, Watchlist, WatchlistItem } from "@csst/shared";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { DATABASE } from "../db/db.module.js";
 import { parseNullableNumber } from "./watchlists.utils.js";
@@ -100,6 +100,21 @@ export class WatchlistsRepository {
       },
       latestSnapshots: []
     }));
+  }
+
+  async getItemHistory(itemId: string): Promise<ItemHistory> {
+    const [entry] = await this.getWatchlistEntries([itemId]);
+
+    if (entry === undefined) {
+      throw new NotFoundException("Watchlist item not found");
+    }
+
+    const snapshots = await this.getSnapshotsForItem(itemId);
+
+    return {
+      item: entry.item,
+      snapshots
+    };
   }
 
   async addItem(marketHashName: string): Promise<WatchlistItem> {
@@ -324,6 +339,39 @@ export class WatchlistsRepository {
     }
 
     return snapshotsByItem;
+  }
+
+  private async getSnapshotsForItem(itemId: string): Promise<PriceSnapshot[]> {
+    const rows = await this.db
+      .select({
+        id: priceSnapshots.id,
+        itemId: priceSnapshots.itemId,
+        provider: priceSnapshots.providerId,
+        lowestAsk: priceSnapshots.lowestAsk,
+        highestBid: priceSnapshots.highestBid,
+        askVolume: priceSnapshots.askVolume,
+        bidVolume: priceSnapshots.bidVolume,
+        currency: priceSnapshots.currency,
+        sourceUpdatedAt: priceSnapshots.sourceUpdatedAt,
+        collectedAt: priceSnapshots.collectedAt
+      })
+      .from(priceSnapshots)
+      .where(eq(priceSnapshots.itemId, itemId))
+      .orderBy(asc(priceSnapshots.collectedAt));
+
+    return rows.map((row) => ({
+      id: row.id,
+      itemId: row.itemId,
+      provider: row.provider,
+      lowestAsk: parseNullableNumber(row.lowestAsk),
+      highestBid: parseNullableNumber(row.highestBid),
+      askVolume: row.askVolume,
+      bidVolume: row.bidVolume,
+      currency: "USD",
+      sourceUpdatedAt: row.sourceUpdatedAt?.toISOString() ?? null,
+      collectedAt: row.collectedAt.toISOString(),
+      isStale: isStale(row.collectedAt)
+    }));
   }
 }
 

@@ -13,6 +13,11 @@ export class WatchlistsController {
     return this.watchlists.getDefaultWatchlist();
   }
 
+  @Get("items/:itemId/history")
+  getItemHistory(@Param("itemId") itemId: string) {
+    return this.watchlists.getItemHistory(itemId);
+  }
+
   @Post("items")
   addItem(@Body() body: AddWatchlistItemRequest) {
     const request = addWatchlistItemRequestSchema.parse(body);
