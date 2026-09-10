@@ -170,4 +170,79 @@ describe("WatchlistsService", () => {
       })
     );
   });
+
+  it("continues when a sync run cannot be created for one item", async () => {
+    const listPrices = vi.fn().mockResolvedValue({
+      data: {
+        items: [
+          {
+            provider: "steam",
+            lowest_ask_decimal: "72.10",
+            highest_bid_decimal: "70.50",
+            quantity: 3,
+            bid_volume: 2,
+            timestamp: "2026-09-10T12:00:00.000Z"
+          }
+        ]
+      },
+      rateLimit: {
+        limit: 1000,
+        remaining: 998,
+        resetAt: null
+      }
+    });
+    const createSyncRun = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Unable to create sync run"))
+      .mockResolvedValueOnce("sync-run-2");
+    const createSnapshots = vi.fn().mockResolvedValue(1);
+    const finishSyncRun = vi.fn();
+    const service = new WatchlistsService(
+      {
+        getMonthlyRequestLimit: () => 1000,
+        isConfigured: () => true,
+        listPrices
+      } as unknown as Cs2CapService,
+      {
+        getWatchlistEntries: () => Promise.resolve([watchlistItem, secondWatchlistItem]),
+        getMonthlyRequestUsage: () => Promise.resolve(0),
+        createSyncRun,
+        createSnapshots,
+        finishSyncRun
+      } as unknown as WatchlistsRepository
+    );
+
+    await expect(service.refresh()).resolves.toEqual({
+      requestedItems: 2,
+      snapshotsCreated: 1,
+      remainingMonthlyBudget: 998,
+      failedItems: 1,
+      itemResults: [
+        {
+          itemId: watchlistItem.item.id,
+          marketHashName: watchlistItem.item.marketHashName,
+          status: "failed",
+          snapshotsCreated: 0,
+          errorMessage: "Unable to create sync run"
+        },
+        {
+          itemId: secondWatchlistItem.item.id,
+          marketHashName: secondWatchlistItem.item.marketHashName,
+          status: "succeeded",
+          snapshotsCreated: 1
+        }
+      ]
+    });
+    expect(listPrices).toHaveBeenCalledTimes(1);
+    expect(listPrices).toHaveBeenCalledWith(secondWatchlistItem.item.marketHashName);
+    expect(finishSyncRun).toHaveBeenCalledTimes(1);
+    expect(finishSyncRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "sync-run-2",
+        status: "succeeded",
+        snapshotsCreated: 1,
+        responseStatus: 200
+      })
+    );
+  });
 });

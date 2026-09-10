@@ -71,14 +71,27 @@ export class WatchlistsService {
     const itemResults: RefreshWatchlistResponse["itemResults"] = [];
 
     for (const watchlistItem of selectedItems) {
-      const syncRunId = await this.repository.createSyncRun({
-        itemId: watchlistItem.item.id,
-        marketHashName: watchlistItem.item.marketHashName,
-        requestedItemCount: 1,
-        requestCost: 1
-      });
+      let syncRunId: string;
       let itemSnapshotsCreated = 0;
       let responseStatus: number | null = null;
+
+      try {
+        syncRunId = await this.repository.createSyncRun({
+          itemId: watchlistItem.item.id,
+          marketHashName: watchlistItem.item.marketHashName,
+          requestedItemCount: 1,
+          requestCost: 1
+        });
+      } catch (error) {
+        itemResults.push({
+          itemId: watchlistItem.item.id,
+          marketHashName: watchlistItem.item.marketHashName,
+          status: "failed",
+          snapshotsCreated: 0,
+          errorMessage: getErrorMessage(error)
+        });
+        continue;
+      }
 
       try {
         const result = await this.cs2cap.listPrices(watchlistItem.item.marketHashName);
@@ -116,12 +129,13 @@ export class WatchlistsService {
           snapshotsCreated: itemSnapshotsCreated
         });
       } catch (error) {
+        const errorMessage = getErrorMessage(error);
         await this.repository.finishSyncRun({
           id: syncRunId,
           status: "failed",
           snapshotsCreated: itemSnapshotsCreated,
           responseStatus: getResponseStatus(error, responseStatus),
-          errorMessage: getErrorMessage(error)
+          errorMessage
         });
 
         itemResults.push({
@@ -129,7 +143,7 @@ export class WatchlistsService {
           marketHashName: watchlistItem.item.marketHashName,
           status: "failed",
           snapshotsCreated: itemSnapshotsCreated,
-          errorMessage: getErrorMessage(error)
+          errorMessage
         });
       }
     }
