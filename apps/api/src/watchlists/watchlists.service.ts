@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { Cs2CapError } from "@csst/cs2cap";
 import type { RefreshWatchlistResponse, WatchlistItem } from "@csst/shared";
 
 import { Cs2CapService } from "../cs2cap/cs2cap.service.js";
@@ -36,7 +37,9 @@ export class WatchlistsService {
       return {
         requestedItems: 0,
         snapshotsCreated: 0,
-        remainingMonthlyBudget: await this.getRemainingBudget()
+        remainingMonthlyBudget: await this.getRemainingBudget(),
+        failedItems: 0,
+        itemResults: []
       };
     }
 
@@ -44,7 +47,15 @@ export class WatchlistsService {
       return {
         requestedItems: selectedItems.length,
         snapshotsCreated: 0,
-        remainingMonthlyBudget: await this.getRemainingBudget()
+        remainingMonthlyBudget: await this.getRemainingBudget(),
+        failedItems: 0,
+        itemResults: selectedItems.map((item) => ({
+          itemId: item.item.id,
+          marketHashName: item.item.marketHashName,
+          status: "skipped",
+          snapshotsCreated: 0,
+          errorMessage: "CS2Cap API key is not configured"
+        }))
       };
     }
 
@@ -56,16 +67,37 @@ export class WatchlistsService {
       throw new BadRequestException("CS2Cap monthly request budget would be exceeded");
     }
 
-    const syncRunId = await this.repository.createSyncRun({
-      requestedItemCount: selectedItems.length,
-      requestCost
-    });
-
     let snapshotsCreated = 0;
+    let attemptedRequestCost = 0;
+    const itemResults: RefreshWatchlistResponse["itemResults"] = [];
 
-    try {
-      for (const watchlistItem of selectedItems) {
+    for (const watchlistItem of selectedItems) {
+      let syncRunId: string;
+      let itemSnapshotsCreated = 0;
+      let responseStatus: number | null = null;
+
+      try {
+        syncRunId = await this.repository.createSyncRun({
+          itemId: watchlistItem.item.id,
+          marketHashName: watchlistItem.item.marketHashName,
+          requestedItemCount: 1,
+          requestCost: 1
+        });
+        attemptedRequestCost += 1;
+      } catch (error) {
+        itemResults.push({
+          itemId: watchlistItem.item.id,
+          marketHashName: watchlistItem.item.marketHashName,
+          status: "failed",
+          snapshotsCreated: 0,
+          errorMessage: getErrorMessage(error)
+        });
+        continue;
+      }
+
+      try {
         const result = await this.cs2cap.listPrices(watchlistItem.item.marketHashName);
+        responseStatus = 200;
         const snapshots = result.data.items.map<SnapshotInput>((price) => ({
           itemId: watchlistItem.item.id,
           providerId: price.provider ?? "unknown",
@@ -79,37 +111,64 @@ export class WatchlistsService {
           collectedAt: new Date()
         }));
 
-        snapshotsCreated += await this.repository.createSnapshots(snapshots);
+        itemSnapshotsCreated = await this.repository.createSnapshots(snapshots);
+        snapshotsCreated += itemSnapshotsCreated;
 
         await this.repository.finishSyncRun({
           id: syncRunId,
           status: "succeeded",
-          snapshotsCreated,
+          snapshotsCreated: itemSnapshotsCreated,
+          responseStatus,
           rateLimitLimit: result.rateLimit.limit,
           rateLimitRemaining: result.rateLimit.remaining,
           rateLimitResetAt: result.rateLimit.resetAt
         });
+
+        itemResults.push({
+          itemId: watchlistItem.item.id,
+          marketHashName: watchlistItem.item.marketHashName,
+          status: "succeeded",
+          snapshotsCreated: itemSnapshotsCreated
+        });
+      } catch (error) {
+        const errorMessage = getErrorMessage(error);
+        await this.repository.finishSyncRun({
+          id: syncRunId,
+          status: "failed",
+          snapshotsCreated: itemSnapshotsCreated,
+          responseStatus: getResponseStatus(error, responseStatus),
+          errorMessage
+        });
+
+        itemResults.push({
+          itemId: watchlistItem.item.id,
+          marketHashName: watchlistItem.item.marketHashName,
+          status: "failed",
+          snapshotsCreated: itemSnapshotsCreated,
+          errorMessage
+        });
       }
-
-      return {
-        requestedItems: selectedItems.length,
-        snapshotsCreated,
-        remainingMonthlyBudget: Math.max(remainingMonthlyBudget - requestCost, 0)
-      };
-    } catch (error) {
-      await this.repository.finishSyncRun({
-        id: syncRunId,
-        status: "failed",
-        snapshotsCreated,
-        errorMessage: error instanceof Error ? error.message : "Unknown refresh error"
-      });
-
-      throw error;
     }
+
+    return {
+      requestedItems: selectedItems.length,
+      snapshotsCreated,
+      remainingMonthlyBudget: Math.max(remainingMonthlyBudget - attemptedRequestCost, 0),
+      failedItems: itemResults.filter((result) => result.status === "failed").length,
+      itemResults
+    };
   }
 
   private async getRemainingBudget(): Promise<number> {
     const usedRequests = await this.repository.getMonthlyRequestUsage();
     return Math.max(this.cs2cap.getMonthlyRequestLimit() - usedRequests, 0);
   }
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown refresh error";
+}
+
+function getResponseStatus(error: unknown, fallback: number | null): number | null {
+  return error instanceof Cs2CapError ? error.status : fallback;
 }

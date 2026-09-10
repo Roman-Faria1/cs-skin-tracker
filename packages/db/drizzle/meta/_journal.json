@@ -8,6 +8,13 @@
       "when": 1788634263792,
       "tag": "0000_vengeful_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789058990240,
+      "tag": "0001_white_stone_men",
+      "breakpoints": true
     }
   ]
 }

@@ -33,6 +33,8 @@ export interface SnapshotInput {
 }
 
 export interface SyncRunInput {
+  itemId?: string | null;
+  marketHashName?: string | null;
   requestedItemCount: number;
   requestCost: number;
 }
@@ -41,6 +43,7 @@ export interface FinishSyncRunInput {
   id: string;
   status: "succeeded" | "failed";
   snapshotsCreated: number;
+  responseStatus?: number | null;
   rateLimitLimit?: number | null;
   rateLimitRemaining?: number | null;
   rateLimitResetAt?: Date | null;
@@ -183,6 +186,8 @@ export class WatchlistsRepository {
       .insert(syncRuns)
       .values({
         providerId: CS2CAP_PROVIDER_ID,
+        itemId: input.itemId ?? null,
+        marketHashName: input.marketHashName ?? null,
         status: "started",
         requestedItemCount: input.requestedItemCount,
         requestCost: input.requestCost
@@ -202,6 +207,7 @@ export class WatchlistsRepository {
       .set({
         status: input.status,
         snapshotsCreated: input.snapshotsCreated,
+        responseStatus: input.responseStatus ?? null,
         rateLimitLimit: input.rateLimitLimit ?? null,
         rateLimitRemaining: input.rateLimitRemaining ?? null,
         rateLimitResetAt: input.rateLimitResetAt ?? null,

@@ -25,7 +25,8 @@
 ## v0.2 - Data Quality & Historical Tracking
 
 - [x] Initial `sync_runs` schema.
-- [ ] Sync-run logging around all CS2Cap requests.
+- [x] Sync-run logging around manual CS2Cap refresh requests.
+- [x] Partial refresh failure handling that preserves successful snapshots.
 - [x] Stale-data UI labels from persisted timestamps.
 - [ ] Scheduled worker sync for watched items.
 - [x] Provider comparison view.

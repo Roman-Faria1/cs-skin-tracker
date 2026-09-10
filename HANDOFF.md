@@ -3,21 +3,23 @@
 ## Current State
 
 - Repo: `https://github.com/Roman-Faria1/cs-skin-tracker.git`
-- Current branch: `feat/v0-2-data-quality`
-- Latest commit: `998f660 feat: add data quality comparison UI`
+- Current branch: `feat/v0-2-sync-observability`
+- Latest merged main commit: `6549ede Merge pull request #1 from Roman-Faria1/feat/v0-2-data-quality`
 - Main stack: TypeScript, pnpm workspaces, Next.js, NestJS/Fastify, Drizzle, Postgres, Redis/BullMQ.
 - Data provider: CS2Cap free-tier live prices via `GET https://api.cs2c.app/v1/prices`.
 - v0.1 is effectively complete for personal MVP usage.
-- v0.2 has started with stale-data labels and provider comparison UI.
+- v0.2 now includes stale-data labels, provider comparison UI, and manual refresh observability.
+- Current branch adds per-item `sync_runs` logging, partial refresh failures, and dashboard refresh summaries.
 
 Recent commits:
 
 ```txt
+6549ede Merge pull request #1 from Roman-Faria1/feat/v0-2-data-quality
+56fba2c fix: select newest provider snapshots
+5796be8 fix: address watchlist review feedback
+a8fbd55 docs: add project handoff notes
 998f660 feat: add data quality comparison UI
 9609b3c fix: align cs2cap live price integration
-f2f85ec fix: avoid local postgres port conflict
-5809b08 feat: add item price history detail view
-015fd1e feat: scaffold persisted skin tracker
 ```
 
 ## Local Setup
@@ -87,6 +89,8 @@ Important flows:
 - `POST /watchlists/default/items` adds by `marketHashName`.
 - `DELETE /watchlists/default/items/:id` removes a watchlist row.
 - `POST /watchlists/default/refresh` calls CS2Cap and persists price snapshots.
+- Manual refresh returns per-item results with `succeeded`, `failed`, or `skipped` status.
+- Each attempted CS2Cap item refresh creates a `sync_runs` row with target item/name, request cost, response status, rate-limit headers when available, snapshots created, and error message when failed.
 - `GET /watchlists/default/items/:itemId/history` returns chronological snapshots for the detail chart.
 
 CS2Cap live response was validated on September 5, 2026 with:
@@ -121,7 +125,7 @@ Validated recently:
 - Typecheck passed.
 - Lint passed.
 - Format passed.
-- Tests passed: 4 files, 9 tests.
+- Tests passed: 4 files, 11 tests.
 - Build passed. Next emits a warning that the Next ESLint plugin is not detected in the flat ESLint config; this is known and non-blocking.
 
 Docker validation already completed locally:
@@ -134,14 +138,13 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 
 ## Next Recommended Work
 
-Stay on `feat/v0-2-data-quality`.
+Current branch: `feat/v0-2-sync-observability`.
 
-Recommended next slice:
+Before merging this branch:
 
-1. Add stronger sync-run logging around every CS2Cap request.
-2. Record partial refresh failures per item instead of failing the whole refresh opaquely.
-3. Surface refresh errors in the dashboard without losing stale cached data.
-4. Push the feature branch and open a PR when the v0.2 slice is stable.
+1. Run `corepack pnpm db:migrate` against local Postgres to apply `0001_white_stone_men.sql`.
+2. Smoke test manual refresh with the real CS2Cap key and verify partial-failure status text still reloads cached watchlist data.
+3. Push the branch and open a PR.
 
 After that:
 

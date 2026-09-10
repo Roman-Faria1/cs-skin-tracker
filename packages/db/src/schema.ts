@@ -98,10 +98,13 @@ export const priceSnapshots = pgTable("price_snapshots", {
 export const syncRuns = pgTable("sync_runs", {
   id: uuid("id").defaultRandom().primaryKey(),
   providerId: text("provider_id").references(() => marketProviders.id),
+  itemId: uuid("item_id").references(() => items.id, { onDelete: "set null" }),
+  marketHashName: text("market_hash_name"),
   status: syncStatusEnum("status").notNull(),
   requestedItemCount: integer("requested_item_count").default(0).notNull(),
   snapshotsCreated: integer("snapshots_created").default(0).notNull(),
   requestCost: integer("request_cost").default(1).notNull(),
+  responseStatus: integer("response_status"),
   rateLimitLimit: integer("rate_limit_limit"),
   rateLimitRemaining: integer("rate_limit_remaining"),
   rateLimitResetAt: timestamp("rate_limit_reset_at", { withTimezone: true }),
