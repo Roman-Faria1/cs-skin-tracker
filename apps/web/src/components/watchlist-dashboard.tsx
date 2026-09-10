@@ -123,13 +123,14 @@ export function WatchlistDashboard() {
 
         <p className="status">{status}</p>
 
-        <section className="table-wrap" aria-label="Watchlist">
+        <section className="table-wrap watchlist-table" aria-label="Watchlist">
           <table>
             <thead>
               <tr>
                 <th>Skin</th>
                 <th>Latest Providers</th>
-                <th>Last Collected</th>
+                <th>Best Market</th>
+                <th>Freshness</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -156,7 +157,9 @@ export function WatchlistDashboard() {
                               key={snapshot.id}
                             >
                               {snapshot.provider}:{" "}
-                              {snapshot.lowestAsk === null ? "n/a" : `$${snapshot.lowestAsk}`}
+                              {snapshot.lowestAsk === null
+                                ? "n/a"
+                                : formatCurrency(snapshot.lowestAsk)}
                             </span>
                           ))}
                         </div>
@@ -176,7 +179,7 @@ export function WatchlistDashboard() {
                       )}
                     </td>
                     <td>
-                      <span className={`status-badge ${newest?.isStale ? "stale" : "fresh"}`}>
+                      <span className={`status-badge ${getStatusClassName(newest)}`}>
                         {newest === undefined
                           ? "Not refreshed"
                           : newest.isStale
@@ -203,7 +206,7 @@ export function WatchlistDashboard() {
               })}
               {watchlist !== null && watchlist.items.length === 0 ? (
                 <tr>
-                  <td className="empty" colSpan={4}>
+                  <td className="empty" colSpan={5}>
                     Add a market hash name to begin tracking.
                   </td>
                 </tr>
@@ -215,6 +218,11 @@ export function WatchlistDashboard() {
     </main>
   );
 }
+
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD"
+});
 
 function getLatestSnapshotsByProvider(snapshots: PriceSnapshot[]): PriceSnapshot[] {
   const latest = new Map<string, PriceSnapshot>();
@@ -257,8 +265,13 @@ function getProviderComparison(snapshots: PriceSnapshot[]): ProviderComparison |
 }
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD"
-  }).format(value);
+  return currencyFormatter.format(value);
+}
+
+function getStatusClassName(snapshot: PriceSnapshot | undefined): string {
+  if (snapshot === undefined) {
+    return "neutral";
+  }
+
+  return snapshot.isStale ? "stale" : "fresh";
 }

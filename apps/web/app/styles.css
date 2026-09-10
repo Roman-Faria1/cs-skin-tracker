@@ -178,8 +178,8 @@ th {
   text-transform: uppercase;
 }
 
-th:nth-child(3),
-td:nth-child(3) {
+.watchlist-table th:nth-child(3),
+.watchlist-table td:nth-child(3) {
   min-width: 180px;
 }
 
@@ -241,6 +241,11 @@ tr:last-child td {
 .status-badge.stale {
   background: #fff4e5;
   color: #8a4b0f;
+}
+
+.status-badge.neutral {
+  background: var(--surface-strong);
+  color: var(--muted);
 }
 
 .empty {
@@ -448,8 +453,8 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 
-  th:nth-child(3),
-  td:nth-child(3) {
+  .watchlist-table th:nth-child(3),
+  .watchlist-table td:nth-child(3) {
     display: none;
   }
 }
