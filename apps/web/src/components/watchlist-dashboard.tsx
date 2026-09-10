@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import type { PriceSnapshot, Watchlist } from "@csst/shared";
+import type { PriceSnapshot, RefreshWatchlistResponse, Watchlist } from "@csst/shared";
 
 import {
   addWatchlistItem,
@@ -57,11 +57,7 @@ export function WatchlistDashboard() {
 
     try {
       const result = await refreshWatchlist();
-      await loadWatchlist(
-        `Refresh complete. ${result.snapshotsCreated} snapshots created. Remaining monthly budget: ${
-          result.remainingMonthlyBudget ?? "unknown"
-        }.`
-      );
+      await loadWatchlist(getRefreshStatusMessage(result));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Unable to refresh prices.");
     } finally {
@@ -279,4 +275,22 @@ function getStatusClassName(snapshot: PriceSnapshot | undefined): string {
 
 function compareCollectedAtDesc(left: PriceSnapshot, right: PriceSnapshot): number {
   return Date.parse(right.collectedAt) - Date.parse(left.collectedAt);
+}
+
+function getRefreshStatusMessage(result: RefreshWatchlistResponse): string {
+  const budget = result.remainingMonthlyBudget ?? "unknown";
+
+  if (result.failedItems > 0) {
+    const failedNames = result.itemResults
+      .filter((item) => item.status === "failed")
+      .slice(0, 3)
+      .map((item) => item.marketHashName)
+      .join(", ");
+
+    return `Refresh completed with ${result.failedItems} failed item${
+      result.failedItems === 1 ? "" : "s"
+    }. ${result.snapshotsCreated} snapshots created. Failed: ${failedNames}. Remaining monthly budget: ${budget}.`;
+  }
+
+  return `Refresh complete. ${result.snapshotsCreated} snapshots created. Remaining monthly budget: ${budget}.`;
 }

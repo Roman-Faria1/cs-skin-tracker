@@ -1,4 +1,4 @@
-import { itemHistorySchema, watchlistSchema } from "@csst/shared";
+import { itemHistorySchema, refreshWatchlistResponseSchema, watchlistSchema } from "@csst/shared";
 import type {
   AddWatchlistItemRequest,
   ItemHistory,
@@ -65,5 +65,5 @@ export async function refreshWatchlist(): Promise<RefreshWatchlistResponse> {
     throw new Error(`Failed to refresh watchlist: ${response.status}`);
   }
 
-  return (await response.json()) as RefreshWatchlistResponse;
+  return refreshWatchlistResponseSchema.parse(await response.json());
 }

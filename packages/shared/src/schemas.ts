@@ -58,10 +58,20 @@ export const refreshWatchlistRequestSchema = z.object({
   itemIds: z.array(z.string().uuid()).min(1).max(100).optional()
 });
 
+export const refreshWatchlistItemResultSchema = z.object({
+  itemId: z.string().uuid(),
+  marketHashName: marketHashNameSchema,
+  status: z.enum(["succeeded", "failed", "skipped"]),
+  snapshotsCreated: z.number().int().nonnegative(),
+  errorMessage: z.string().nullable().optional()
+});
+
 export const refreshWatchlistResponseSchema = z.object({
   requestedItems: z.number().int().nonnegative(),
   snapshotsCreated: z.number().int().nonnegative(),
-  remainingMonthlyBudget: z.number().int().nonnegative().nullable()
+  remainingMonthlyBudget: z.number().int().nonnegative().nullable(),
+  failedItems: z.number().int().nonnegative().default(0),
+  itemResults: z.array(refreshWatchlistItemResultSchema).default([])
 });
 
 export type Provider = z.infer<typeof providerSchema>;
@@ -72,4 +82,5 @@ export type WatchlistItem = z.infer<typeof watchlistItemSchema>;
 export type ItemHistory = z.infer<typeof itemHistorySchema>;
 export type AddWatchlistItemRequest = z.infer<typeof addWatchlistItemRequestSchema>;
 export type RefreshWatchlistRequest = z.infer<typeof refreshWatchlistRequestSchema>;
+export type RefreshWatchlistItemResult = z.infer<typeof refreshWatchlistItemResultSchema>;
 export type RefreshWatchlistResponse = z.infer<typeof refreshWatchlistResponseSchema>;

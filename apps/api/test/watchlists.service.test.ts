@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Cs2CapService } from "../src/cs2cap/cs2cap.service.js";
 import type { WatchlistsRepository } from "../src/watchlists/watchlists.repository.js";
@@ -9,6 +9,17 @@ const watchlistItem = {
   item: {
     id: "00000000-0000-4000-8000-000000000201",
     marketHashName: "AK-47 | Redline (Field-Tested)",
+    imageUrl: null,
+    createdAt: new Date().toISOString()
+  },
+  latestSnapshots: []
+};
+
+const secondWatchlistItem = {
+  id: "00000000-0000-4000-8000-000000000102",
+  item: {
+    id: "00000000-0000-4000-8000-000000000202",
+    marketHashName: "AWP | Asiimov (Field-Tested)",
     imageUrl: null,
     createdAt: new Date().toISOString()
   },
@@ -31,7 +42,17 @@ describe("WatchlistsService", () => {
     await expect(service.refresh()).resolves.toEqual({
       requestedItems: 1,
       snapshotsCreated: 0,
-      remainingMonthlyBudget: 975
+      remainingMonthlyBudget: 975,
+      failedItems: 0,
+      itemResults: [
+        {
+          itemId: watchlistItem.item.id,
+          marketHashName: watchlistItem.item.marketHashName,
+          status: "skipped",
+          snapshotsCreated: 0,
+          errorMessage: "CS2Cap API key is not configured"
+        }
+      ]
     });
   });
 
@@ -49,6 +70,104 @@ describe("WatchlistsService", () => {
 
     await expect(service.refresh()).rejects.toThrow(
       "CS2Cap monthly request budget would be exceeded"
+    );
+  });
+
+  it("records partial refresh failures without dropping successful snapshots", async () => {
+    const listPrices = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              provider: "steam",
+              lowest_ask_decimal: "14.52",
+              highest_bid_decimal: "13.40",
+              quantity: 12,
+              bid_volume: 4,
+              timestamp: "2026-09-10T12:00:00.000Z"
+            }
+          ]
+        },
+        rateLimit: {
+          limit: 1000,
+          remaining: 998,
+          resetAt: null
+        }
+      })
+      .mockRejectedValueOnce(new Error("CS2Cap unavailable"));
+    const createSyncRun = vi
+      .fn()
+      .mockResolvedValueOnce("sync-run-1")
+      .mockResolvedValueOnce("sync-run-2");
+    const createSnapshots = vi.fn().mockResolvedValue(1);
+    const finishSyncRun = vi.fn();
+    const service = new WatchlistsService(
+      {
+        getMonthlyRequestLimit: () => 1000,
+        isConfigured: () => true,
+        listPrices
+      } as unknown as Cs2CapService,
+      {
+        getWatchlistEntries: () => Promise.resolve([watchlistItem, secondWatchlistItem]),
+        getMonthlyRequestUsage: () => Promise.resolve(0),
+        createSyncRun,
+        createSnapshots,
+        finishSyncRun
+      } as unknown as WatchlistsRepository
+    );
+
+    await expect(service.refresh()).resolves.toEqual({
+      requestedItems: 2,
+      snapshotsCreated: 1,
+      remainingMonthlyBudget: 998,
+      failedItems: 1,
+      itemResults: [
+        {
+          itemId: watchlistItem.item.id,
+          marketHashName: watchlistItem.item.marketHashName,
+          status: "succeeded",
+          snapshotsCreated: 1
+        },
+        {
+          itemId: secondWatchlistItem.item.id,
+          marketHashName: secondWatchlistItem.item.marketHashName,
+          status: "failed",
+          snapshotsCreated: 0,
+          errorMessage: "CS2Cap unavailable"
+        }
+      ]
+    });
+    expect(createSyncRun).toHaveBeenNthCalledWith(1, {
+      itemId: watchlistItem.item.id,
+      marketHashName: watchlistItem.item.marketHashName,
+      requestedItemCount: 1,
+      requestCost: 1
+    });
+    expect(createSyncRun).toHaveBeenNthCalledWith(2, {
+      itemId: secondWatchlistItem.item.id,
+      marketHashName: secondWatchlistItem.item.marketHashName,
+      requestedItemCount: 1,
+      requestCost: 1
+    });
+    expect(finishSyncRun).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        id: "sync-run-1",
+        status: "succeeded",
+        snapshotsCreated: 1,
+        responseStatus: 200
+      })
+    );
+    expect(finishSyncRun).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        id: "sync-run-2",
+        status: "failed",
+        snapshotsCreated: 0,
+        responseStatus: null,
+        errorMessage: "CS2Cap unavailable"
+      })
     );
   });
 });
