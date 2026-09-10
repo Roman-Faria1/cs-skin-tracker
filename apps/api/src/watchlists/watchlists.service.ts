@@ -68,6 +68,7 @@ export class WatchlistsService {
     }
 
     let snapshotsCreated = 0;
+    let attemptedRequestCost = 0;
     const itemResults: RefreshWatchlistResponse["itemResults"] = [];
 
     for (const watchlistItem of selectedItems) {
@@ -82,6 +83,7 @@ export class WatchlistsService {
           requestedItemCount: 1,
           requestCost: 1
         });
+        attemptedRequestCost += 1;
       } catch (error) {
         itemResults.push({
           itemId: watchlistItem.item.id,
@@ -151,7 +153,7 @@ export class WatchlistsService {
     return {
       requestedItems: selectedItems.length,
       snapshotsCreated,
-      remainingMonthlyBudget: Math.max(remainingMonthlyBudget - requestCost, 0),
+      remainingMonthlyBudget: Math.max(remainingMonthlyBudget - attemptedRequestCost, 0),
       failedItems: itemResults.filter((result) => result.status === "failed").length,
       itemResults
     };

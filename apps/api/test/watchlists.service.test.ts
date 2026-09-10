@@ -215,7 +215,7 @@ describe("WatchlistsService", () => {
     await expect(service.refresh()).resolves.toEqual({
       requestedItems: 2,
       snapshotsCreated: 1,
-      remainingMonthlyBudget: 998,
+      remainingMonthlyBudget: 999,
       failedItems: 1,
       itemResults: [
         {
