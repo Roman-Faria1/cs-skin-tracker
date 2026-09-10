@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import type { Watchlist } from "@csst/shared";
+import type { PriceSnapshot, Watchlist } from "@csst/shared";
 
 import {
   addWatchlistItem,
@@ -135,7 +135,9 @@ export function WatchlistDashboard() {
             </thead>
             <tbody>
               {watchlist?.items.map((entry) => {
-                const newest = entry.latestSnapshots[0];
+                const latestSnapshots = getLatestSnapshotsByProvider(entry.latestSnapshots);
+                const newest = latestSnapshots[0];
+                const comparison = getProviderComparison(latestSnapshots);
 
                 return (
                   <tr key={entry.id}>
@@ -144,12 +146,15 @@ export function WatchlistDashboard() {
                       <div className="muted">{entry.item.id}</div>
                     </td>
                     <td>
-                      {entry.latestSnapshots.length === 0 ? (
+                      {latestSnapshots.length === 0 ? (
                         <span className="muted">No snapshots yet</span>
                       ) : (
                         <div className="snapshot-list">
-                          {entry.latestSnapshots.slice(0, 4).map((snapshot) => (
-                            <span className="snapshot-pill" key={snapshot.id}>
+                          {latestSnapshots.slice(0, 5).map((snapshot) => (
+                            <span
+                              className={`snapshot-pill ${snapshot.isStale ? "stale" : "fresh"}`}
+                              key={snapshot.id}
+                            >
                               {snapshot.provider}:{" "}
                               {snapshot.lowestAsk === null ? "n/a" : `$${snapshot.lowestAsk}`}
                             </span>
@@ -157,7 +162,29 @@ export function WatchlistDashboard() {
                         </div>
                       )}
                     </td>
-                    <td className="muted">{newest?.collectedAt ?? "Not refreshed"}</td>
+                    <td>
+                      {comparison === null ? (
+                        <span className="muted">No priced providers</span>
+                      ) : (
+                        <div className="comparison-cell">
+                          <strong>{comparison.cheapest.provider}</strong>
+                          <span className="muted">
+                            Low {formatCurrency(comparison.cheapest.lowestAsk)} · Spread{" "}
+                            {formatCurrency(comparison.spread)}
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`status-badge ${newest?.isStale ? "stale" : "fresh"}`}>
+                        {newest === undefined
+                          ? "Not refreshed"
+                          : newest.isStale
+                            ? "Stale"
+                            : "Fresh"}
+                      </span>
+                      <div className="muted">{newest?.collectedAt ?? ""}</div>
+                    </td>
                     <td>
                       <a className="button secondary compact" href={`/items/${entry.item.id}`}>
                         View
@@ -187,4 +214,51 @@ export function WatchlistDashboard() {
       </div>
     </main>
   );
+}
+
+function getLatestSnapshotsByProvider(snapshots: PriceSnapshot[]): PriceSnapshot[] {
+  const latest = new Map<string, PriceSnapshot>();
+  for (const snapshot of snapshots) {
+    if (!latest.has(snapshot.provider)) {
+      latest.set(snapshot.provider, snapshot);
+    }
+  }
+
+  return Array.from(latest.values());
+}
+
+interface ProviderComparison {
+  cheapest: PriceSnapshot & { lowestAsk: number };
+  mostExpensive: PriceSnapshot & { lowestAsk: number };
+  spread: number;
+}
+
+function getProviderComparison(snapshots: PriceSnapshot[]): ProviderComparison | null {
+  const pricedSnapshots = snapshots.filter(
+    (snapshot): snapshot is PriceSnapshot & { lowestAsk: number } => snapshot.lowestAsk !== null
+  );
+
+  if (pricedSnapshots.length === 0) {
+    return null;
+  }
+
+  const sorted = pricedSnapshots.sort((left, right) => left.lowestAsk - right.lowestAsk);
+  const cheapest = sorted[0];
+  const mostExpensive = sorted.at(-1);
+  if (cheapest === undefined || mostExpensive === undefined) {
+    return null;
+  }
+
+  return {
+    cheapest,
+    mostExpensive,
+    spread: mostExpensive.lowestAsk - cheapest.lowestAsk
+  };
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD"
+  }).format(value);
 }
