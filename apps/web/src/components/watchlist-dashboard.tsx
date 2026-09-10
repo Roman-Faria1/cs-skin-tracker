@@ -227,12 +227,13 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 function getLatestSnapshotsByProvider(snapshots: PriceSnapshot[]): PriceSnapshot[] {
   const latest = new Map<string, PriceSnapshot>();
   for (const snapshot of snapshots) {
-    if (!latest.has(snapshot.provider)) {
+    const current = latest.get(snapshot.provider);
+    if (current === undefined || compareCollectedAtDesc(snapshot, current) < 0) {
       latest.set(snapshot.provider, snapshot);
     }
   }
 
-  return Array.from(latest.values());
+  return Array.from(latest.values()).sort(compareCollectedAtDesc);
 }
 
 interface ProviderComparison {
@@ -274,4 +275,8 @@ function getStatusClassName(snapshot: PriceSnapshot | undefined): string {
   }
 
   return snapshot.isStale ? "stale" : "fresh";
+}
+
+function compareCollectedAtDesc(left: PriceSnapshot, right: PriceSnapshot): number {
+  return Date.parse(right.collectedAt) - Date.parse(left.collectedAt);
 }
