@@ -26,9 +26,9 @@
 
 - [x] Initial `sync_runs` schema.
 - [ ] Sync-run logging around all CS2Cap requests.
-- [ ] Stale-data UI labels from persisted timestamps.
+- [x] Stale-data UI labels from persisted timestamps.
 - [ ] Scheduled worker sync for watched items.
-- [ ] Provider comparison view.
+- [x] Provider comparison view.
 - [ ] Import/export watchlist.
 
 ## v0.3 - Alerts & Portfolio Features

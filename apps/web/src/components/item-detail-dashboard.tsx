@@ -104,7 +104,12 @@ export function ItemDetailDashboard({ itemId }: { itemId: string }) {
                         {snapshot.lowestAsk === null ? "n/a" : formatCurrency(snapshot.lowestAsk)}
                       </span>
                     </div>
-                    <time className="provider-time">{formatDateTime(snapshot.collectedAt)}</time>
+                    <div className="provider-meta">
+                      <span className={`status-badge ${snapshot.isStale ? "stale" : "fresh"}`}>
+                        {snapshot.isStale ? "Stale" : "Fresh"}
+                      </span>
+                      <time className="provider-time">{formatDateTime(snapshot.collectedAt)}</time>
+                    </div>
                   </div>
                 ))}
               </div>
