@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "corepack pnpm --filter @csst/shared --filter @csst/cs2cap build && tsc -p tsconfig.json && node dist/apps/api/src/main.js",
+    "dev": "corepack pnpm --filter @csst/shared --filter @csst/cs2cap --filter @csst/db build && tsc -p tsconfig.json && node dist/apps/api/src/main.js",
     "start": "node dist/apps/api/src/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"

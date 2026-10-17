@@ -3,13 +3,17 @@
 ## Current State
 
 - Repo: `https://github.com/Roman-Faria1/cs-skin-tracker.git`
-- Current branch: `feat/v0-2-sync-observability`
-- Latest merged main commit: `6549ede Merge pull request #1 from Roman-Faria1/feat/v0-2-data-quality`
+- Current branch: `fix/v0-2-refresh-safety`
+- Latest merged main commit: `92d62ad` (PR #2, sync observability).
 - Main stack: TypeScript, pnpm workspaces, Next.js, NestJS/Fastify, Drizzle, Postgres, Redis/BullMQ.
 - Data provider: CS2Cap free-tier live prices via `GET https://api.cs2c.app/v1/prices`.
 - v0.1 is effectively complete for personal MVP usage.
 - v0.2 now includes stale-data labels, provider comparison UI, and manual refresh observability.
-- Current branch adds per-item `sync_runs` logging, partial refresh failures, and dashboard refresh summaries.
+- Current work: refresh safety, snapshot correctness, DB integration coverage, then scheduled collection and watchlist transfer.
+- Refresh safety now uses a Postgres advisory transaction lock to reserve quota and enforce per-item cooldown across processes. Network calls happen after the transaction commits.
+- Reservations remain charged if a process crashes or a request times out; this conservatively protects quota. Started rows are never automatically retried.
+- CS2Cap requests default to a 10-second timeout; per-item cooldown defaults to 3600 seconds. Configure with `CS2CAP_REQUEST_TIMEOUT_MS` and `CS2CAP_REFRESH_COOLDOWN_SECONDS`.
+- Authentication/rate-limit responses stop the current refresh; sync-log finalization failures preserve saved snapshots and do not abort remaining items.
 
 Recent commits:
 
@@ -138,19 +142,13 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 
 ## Next Recommended Work
 
-Current branch: `feat/v0-2-sync-observability`.
+1. Complete refresh-safety verification and commit with conventional commits.
+2. Select latest prices per item/provider; distinguish source freshness from fetch time.
+3. Add isolated Postgres integration tests and CI migration validation.
+4. Wire scheduled sync through the same protected refresh service, disabled by default.
+5. Add validated import/export without automatic provider calls.
 
-Before merging this branch:
-
-1. Run `corepack pnpm db:migrate` against local Postgres to apply `0001_white_stone_men.sql`.
-2. Smoke test manual refresh with the real CS2Cap key and verify partial-failure status text still reloads cached watchlist data.
-3. Push the branch and open a PR.
-
-After that:
-
-- Wire scheduled worker sync for watched items at a conservative cadence.
-- Add import/export watchlist.
-- Consider one-request-per-item quota implications before adding automatic refresh.
+Keep this section updated at each completed slice. No real CS2Cap requests should be needed for automated tests.
 
 ## Gotchas
 

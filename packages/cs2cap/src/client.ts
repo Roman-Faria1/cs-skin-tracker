@@ -14,9 +14,11 @@ export class Cs2CapError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly body: string
+    readonly body: string,
+    readonly rateLimit: RateLimitState = { limit: null, remaining: null, resetAt: null }
   ) {
     super(message);
+    this.name = "Cs2CapError";
   }
 }
 
@@ -38,42 +40,41 @@ export class Cs2CapClient {
       url.searchParams.append("providers", provider);
     }
 
-    const response = await this.fetchImpl(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${this.options.apiKey}`
-      }
-    });
-
-    const body = await response.text();
-    const rateLimit = parseRateLimitHeaders(response.headers);
-
-    if (!response.ok) {
-      throw new Cs2CapError(
-        `CS2Cap request failed with status ${response.status}`,
-        response.status,
-        body
-      );
-    }
-
-    const json = JSON.parse(body) as unknown;
-    const data = cs2CapListPricesResponseSchema.parse(json);
-
-    return { data, rateLimit };
+    return this.request(
+      url,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${this.options.apiKey}`
+        }
+      },
+      (json) => cs2CapListPricesResponseSchema.parse(json)
+    );
   }
 
   async getBatchPrices(request: BatchPriceRequest): Promise<BatchPriceResult> {
-    const response = await this.fetchImpl(`${this.baseUrl}/v1/prices/batch`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.options.apiKey}`,
-        "Content-Type": "application/json"
+    return this.request(
+      `${this.baseUrl}/v1/prices/batch`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.options.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          market_hash_names: request.marketHashNames,
+          providers: request.providers,
+          currency: request.currency ?? "USD"
+        })
       },
-      body: JSON.stringify({
-        market_hash_names: request.marketHashNames,
-        providers: request.providers,
-        currency: request.currency ?? "USD"
-      })
+      (json) => cs2CapPricesBatchResponseSchema.parse(json)
+    );
+  }
+
+  private async request<T>(url: string | URL, init: RequestInit, parse: (json: unknown) => T) {
+    const response = await this.fetchImpl(url, {
+      ...init,
+      signal: AbortSignal.timeout(this.options.requestTimeoutMs ?? 10_000)
     });
 
     const body = await response.text();
@@ -83,14 +84,22 @@ export class Cs2CapClient {
       throw new Cs2CapError(
         `CS2Cap request failed with status ${response.status}`,
         response.status,
-        body
+        body,
+        rateLimit
       );
     }
 
-    const json = JSON.parse(body) as unknown;
-    const data = cs2CapPricesBatchResponseSchema.parse(json);
-
-    return { data, rateLimit };
+    try {
+      const json: unknown = JSON.parse(body);
+      return { data: parse(json), rateLimit };
+    } catch {
+      throw new Cs2CapError(
+        "CS2Cap returned an invalid price response",
+        response.status,
+        body,
+        rateLimit
+      );
+    }
   }
 }
 

@@ -15,6 +15,8 @@ const apiEnvSchema = z.object({
   CS2CAP_API_KEY: z.string().min(1).default("replace_me"),
   CS2CAP_BASE_URL: z.string().url().default("https://api.cs2c.app"),
   CS2CAP_MONTHLY_REQUEST_LIMIT: z.coerce.number().int().positive().default(1000),
+  CS2CAP_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  CS2CAP_REFRESH_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(3600),
   CS2CAP_DEFAULT_PROVIDERS: z
     .string()
     .default("steam,csfloat,skinport,csmoney_m,csmoney_t")
@@ -36,6 +38,8 @@ export function loadApiEnv() {
     cs2capApiKey: parsed.CS2CAP_API_KEY,
     cs2capBaseUrl: parsed.CS2CAP_BASE_URL,
     cs2capMonthlyRequestLimit: parsed.CS2CAP_MONTHLY_REQUEST_LIMIT,
+    cs2capRequestTimeoutMs: parsed.CS2CAP_REQUEST_TIMEOUT_MS,
+    cs2capRefreshCooldownSeconds: parsed.CS2CAP_REFRESH_COOLDOWN_SECONDS,
     cs2capDefaultProviders: parsed.CS2CAP_DEFAULT_PROVIDERS
   };
 }

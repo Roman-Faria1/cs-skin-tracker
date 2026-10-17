@@ -33,11 +33,15 @@ export interface SnapshotInput {
 }
 
 export interface SyncRunInput {
-  itemId?: string | null;
-  marketHashName?: string | null;
-  requestedItemCount: number;
-  requestCost: number;
+  itemId: string;
+  marketHashName: string;
+  monthlyLimit: number;
+  cooldownSeconds: number;
 }
+
+export type SyncReservation =
+  | { status: "reserved"; id: string }
+  | { status: "skipped"; reason: string };
 
 export interface FinishSyncRunInput {
   id: string;
@@ -179,26 +183,53 @@ export class WatchlistsRepository {
       .onConflictDoNothing();
   }
 
-  async createSyncRun(input: SyncRunInput): Promise<string> {
+  async reserveSyncRun(input: SyncRunInput): Promise<SyncReservation> {
     await this.ensureProvider(CS2CAP_PROVIDER_ID, "CS2Cap");
-
-    const [syncRun] = await this.db
-      .insert(syncRuns)
-      .values({
-        providerId: CS2CAP_PROVIDER_ID,
-        itemId: input.itemId ?? null,
-        marketHashName: input.marketHashName ?? null,
-        status: "started",
-        requestedItemCount: input.requestedItemCount,
-        requestCost: input.requestCost
-      })
-      .returning({ id: syncRuns.id });
-
-    if (syncRun === undefined) {
-      throw new Error("Unable to create sync run");
-    }
-
-    return syncRun.id;
+    return this.db.transaction(async (tx) => {
+      // Serialize quota checks and reservations across API instances and worker jobs.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('csst:cs2cap:budget'))`);
+      const now = new Date();
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const [usage] = await tx
+        .select({ used: sql<number>`coalesce(sum(${syncRuns.requestCost}), 0)::int` })
+        .from(syncRuns)
+        .where(
+          and(eq(syncRuns.providerId, CS2CAP_PROVIDER_ID), gte(syncRuns.startedAt, monthStart))
+        );
+      if ((usage?.used ?? 0) >= input.monthlyLimit) {
+        return { status: "skipped", reason: "CS2Cap monthly request budget is exhausted" };
+      }
+      const [recent] = await tx
+        .select({ id: syncRuns.id })
+        .from(syncRuns)
+        .where(
+          and(
+            eq(syncRuns.providerId, CS2CAP_PROVIDER_ID),
+            eq(syncRuns.itemId, input.itemId),
+            gte(syncRuns.startedAt, new Date(now.getTime() - input.cooldownSeconds * 1000))
+          )
+        )
+        .limit(1);
+      if (recent !== undefined) {
+        return {
+          status: "skipped",
+          reason: "Item refresh cooldown is active; cached prices retained"
+        };
+      }
+      const [syncRun] = await tx
+        .insert(syncRuns)
+        .values({
+          providerId: CS2CAP_PROVIDER_ID,
+          itemId: input.itemId,
+          marketHashName: input.marketHashName,
+          status: "started",
+          requestedItemCount: 1,
+          requestCost: 1
+        })
+        .returning({ id: syncRuns.id });
+      if (syncRun === undefined) throw new Error("Unable to reserve sync run");
+      return { status: "reserved", id: syncRun.id };
+    });
   }
 
   async finishSyncRun(input: FinishSyncRunInput): Promise<void> {
@@ -257,7 +288,7 @@ export class WatchlistsRepository {
         used: sql<number>`coalesce(sum(${syncRuns.requestCost}), 0)::int`
       })
       .from(syncRuns)
-      .where(gte(syncRuns.startedAt, monthStart));
+      .where(and(eq(syncRuns.providerId, CS2CAP_PROVIDER_ID), gte(syncRuns.startedAt, monthStart)));
 
     return usage?.used ?? 0;
   }

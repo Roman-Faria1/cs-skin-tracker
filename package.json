@@ -12,7 +12,7 @@
     "typecheck": "corepack pnpm -r typecheck",
     "lint": "eslint .",
     "format": "prettier --check .",
-    "test": "vitest run",
+    "test": "corepack pnpm --filter './packages/*' build && vitest run",
     "test:watch": "vitest",
     "db:generate": "corepack pnpm --filter @csst/db db:generate",
     "db:migrate": "corepack pnpm --filter @csst/db db:migrate",

@@ -57,6 +57,7 @@ export interface Cs2CapClientOptions {
   apiKey: string;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
+  requestTimeoutMs?: number;
 }
 
 export interface BatchPriceRequest {

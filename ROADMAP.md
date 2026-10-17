@@ -27,6 +27,8 @@
 - [x] Initial `sync_runs` schema.
 - [x] Sync-run logging around manual CS2Cap refresh requests.
 - [x] Partial refresh failure handling that preserves successful snapshots.
+- [x] Atomic monthly budget reservations and per-item refresh cooldown.
+- [x] Provider timeouts and stop-on-auth/rate-limit behavior.
 - [x] Stale-data UI labels from persisted timestamps.
 - [ ] Scheduled worker sync for watched items.
 - [x] Provider comparison view.
