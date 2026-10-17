@@ -50,7 +50,14 @@ test("watchlist transfer, skipped refreshes, and source freshness", async ({ pag
     if (path.endsWith("/import")) {
       imports += 1;
       expect(route.request().postDataJSON()).toEqual(transfer);
-      await route.fulfill({ json: { added: 0, skipped: 1, total: 1 } });
+      if (imports === 1) {
+        await route.fulfill({
+          status: 400,
+          json: { message: "Watchlist can contain at most 1000 items; no items were added" }
+        });
+      } else {
+        await route.fulfill({ json: { added: 0, skipped: 1, total: 1 } });
+      }
     } else if (path.endsWith("/export")) {
       await route.fulfill({ json: transfer });
     } else if (path.endsWith("/refresh")) {
@@ -115,8 +122,14 @@ test("watchlist transfer, skipped refreshes, and source freshness", async ({ pag
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(transfer))
   });
+  await expect(page.getByRole("status")).toContainText("at most 1000 items; no items were added");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "watchlist.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(transfer))
+  });
   await expect(page.getByRole("status")).toContainText("0 items; 1 duplicates skipped");
-  expect(imports).toBe(1);
+  expect(imports).toBe(2);
   const downloading = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Watchlist" }).click();
   const download = await downloading;

@@ -1,9 +1,10 @@
 import { fileURLToPath } from "node:url";
 import { createDb, items, priceSnapshots, syncRuns, watchlistItems } from "@csst/db";
 import type { Database } from "@csst/db";
+import { watchlistImportSchema } from "@csst/shared";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { sql } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { WatchlistsRepository } from "../src/watchlists/watchlists.repository.js";
 import type { SnapshotInput } from "../src/watchlists/watchlists.repository.js";
 
@@ -55,6 +56,69 @@ describe.skipIf(!testUrl)("WatchlistsRepository with Postgres", () => {
     expect(results.filter((result) => result.status === "reserved")).toHaveLength(1);
     expect(await repository.getMonthlyRequestUsage()).toBe(1);
   });
+
+  it("dates a reservation in the quota-check month after waiting across the boundary", async () => {
+    const entry = await repository.addItem("Boundary Skin");
+    const other = await repository.addItem("Other Boundary Skin");
+    const realNow = new Date();
+    const boundary = new Date(Date.UTC(realNow.getUTCFullYear(), realNow.getUTCMonth() + 1, 1));
+    let release!: () => void;
+    let acquired!: () => void;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const locked = new Promise<void>((resolve) => {
+      acquired = resolve;
+    });
+    const blocker = db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('csst:cs2cap:budget'))`);
+      acquired();
+      await hold;
+    });
+    await locked;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(boundary.getTime() - 1000));
+    const pending = repository.reserveSyncRun({
+      itemId: entry.item.id,
+      marketHashName: entry.item.marketHashName,
+      monthlyLimit: 1,
+      cooldownSeconds: 3600
+    });
+    try {
+      await expect
+        .poll(
+          async () => {
+            const rows = await db.execute(
+              sql`select count(*)::int as waiting from pg_stat_activity where datname = current_database() and wait_event = 'advisory'`
+            );
+            return Number(rows[0]?.waiting ?? 0);
+          },
+          { timeout: 3000, interval: 10 }
+        )
+        .toBeGreaterThan(0);
+      vi.setSystemTime(boundary);
+      release();
+      expect(await pending).toMatchObject({ status: "reserved" });
+      const [row] = await db.select().from(syncRuns);
+      expect(row?.startedAt).toEqual(boundary);
+      expect(await repository.getMonthlyRequestUsage(boundary)).toBe(1);
+      expect(
+        await repository.reserveSyncRun({
+          itemId: other.item.id,
+          marketHashName: other.item.marketHashName,
+          monthlyLimit: 1,
+          cooldownSeconds: 3600
+        })
+      ).toEqual({ status: "skipped", reason: "CS2Cap monthly request budget is exhausted" });
+    } finally {
+      release();
+      try {
+        await Promise.all([blocker, pending]);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  }, 10000);
 
   it("enforces item cooldown across concurrent requests and after a failed sync", async () => {
     const entry = await repository.addItem("AK-47 | Redline (Field-Tested)");
@@ -183,4 +247,58 @@ describe.skipIf(!testUrl)("WatchlistsRepository with Postgres", () => {
       await db.execute(sql`alter table items drop constraint test_rejected_skin`);
     }
   });
+
+  it("rejects a valid 1000-item merge that would make the export unimportable", async () => {
+    await repository.addItem("Existing Skin");
+    const names = Array.from({ length: 1000 }, (_, i) => `Imported Skin ${i}`);
+    expect(watchlistImportSchema.parse({ version: 1, items: names }).items).toHaveLength(1000);
+    await expect(repository.importItems(names)).rejects.toThrow("at most 1000");
+    expect(
+      (await repository.getWatchlistEntries()).map((entry) => entry.item.marketHashName)
+    ).toEqual(["Existing Skin"]);
+    expect(await db.select().from(items)).toHaveLength(1);
+  });
+
+  it("shares the final watchlist slot between concurrent adds and imports, keeping exports importable", async () => {
+    const watchlist = await repository.getDefaultWatchlist();
+    const fixtureItems = await db
+      .insert(items)
+      .values(
+        Array.from({ length: 999 }, (_, i) => ({
+          marketHashName: `Seed Skin ${i}`,
+          normalizedMarketHashName: `seed skin ${i}`
+        }))
+      )
+      .returning({ id: items.id });
+    await db
+      .insert(watchlistItems)
+      .values(fixtureItems.map((item) => ({ watchlistId: watchlist.id, itemId: item.id })));
+    const results = await Promise.allSettled([
+      repository.addItem("Added Skin"),
+      repository.importItems(["Imported Skin"])
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    const backup = {
+      version: 1,
+      items: (await repository.getWatchlistEntries()).map((entry) => entry.item.marketHashName)
+    };
+    const parsed = watchlistImportSchema.parse(JSON.parse(JSON.stringify(backup)));
+    expect(parsed.items).toHaveLength(1000);
+    expect(await repository.importItems(parsed.items)).toEqual({
+      added: 0,
+      skipped: 1000,
+      total: 1000
+    });
+    await expect(repository.addItem("One Too Many")).rejects.toThrow("at most 1000");
+    await db.delete(watchlistItems);
+    expect(await repository.importItems(parsed.items)).toEqual({
+      added: 1000,
+      skipped: 0,
+      total: 1000
+    });
+    expect(
+      new Set((await repository.getWatchlistEntries()).map((entry) => entry.item.marketHashName))
+    ).toEqual(new Set(parsed.items));
+  }, 30000);
 });

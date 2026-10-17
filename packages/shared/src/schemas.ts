@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const WATCHLIST_ITEM_LIMIT = 1000;
+
 export const marketHashNameSchema = z
   .string()
   .trim()
@@ -58,13 +60,11 @@ export const addWatchlistItemRequestSchema = z.object({
 export const watchlistTransferSchema = z
   .object({
     version: z.literal(1),
-    items: z.array(marketHashNameSchema)
+    items: z.array(marketHashNameSchema).max(WATCHLIST_ITEM_LIMIT)
   })
   .strict();
 
-export const watchlistImportSchema = watchlistTransferSchema.extend({
-  items: z.array(marketHashNameSchema).max(1000)
-});
+export const watchlistImportSchema = watchlistTransferSchema;
 
 export const importWatchlistResponseSchema = z.object({
   added: z.number().int().nonnegative(),

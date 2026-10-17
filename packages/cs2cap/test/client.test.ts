@@ -79,4 +79,67 @@ describe("Cs2CapClient", () => {
     });
     expect(calls).toBe(1);
   });
+
+  it.each([200, 401, 403, 429])(
+    "preserves HTTP %i metadata when the response body disconnects",
+    async (status) => {
+      const client = new Cs2CapClient({
+        apiKey: "test",
+        fetchImpl: () =>
+          Promise.resolve(
+            new Response(
+              new ReadableStream({
+                start(controller) {
+                  controller.error(new Error("Disconnected"));
+                }
+              }),
+              {
+                status,
+                headers: {
+                  "x-ratelimit-limit": "1000",
+                  "x-ratelimit-remaining": "0",
+                  "x-ratelimit-reset": "1793491200"
+                }
+              }
+            )
+          )
+      });
+      await expect(client.listPrices({ marketHashName: "AK-47 | Redline" })).rejects.toMatchObject({
+        name: "Cs2CapError",
+        status,
+        rateLimit: { limit: 1000, remaining: 0, resetAt: new Date(1793491200 * 1000) }
+      });
+    }
+  );
+
+  it("preserves received status and rate limits when the body stalls until timeout", async () => {
+    let calls = 0;
+    const client = new Cs2CapClient({
+      apiKey: "test",
+      requestTimeoutMs: 20,
+      fetchImpl: (_url, init) => {
+        calls += 1;
+        return Promise.resolve(
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                init?.signal?.addEventListener(
+                  "abort",
+                  () => controller.error(new DOMException("Body timed out", "TimeoutError")),
+                  { once: true }
+                );
+              }
+            }),
+            { status: 429, headers: { "x-ratelimit-remaining": "0" } }
+          )
+        );
+      }
+    });
+    await expect(client.listPrices({ marketHashName: "AK-47 | Redline" })).rejects.toMatchObject({
+      name: "Cs2CapError",
+      status: 429,
+      rateLimit: { remaining: 0 }
+    });
+    expect(calls).toBe(1);
+  });
 });

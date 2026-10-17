@@ -73,5 +73,7 @@ on desktop and mobile. They make no CS2Cap calls. Screenshots and failure traces
 
 Use Import Watchlist and Export Watchlist to transfer version 1 JSON files containing
 `{ "version": 1, "items": ["AK-47 | Redline (Field-Tested)"] }`.
-Imports merge up to 1000 names, skip normalized duplicates, and do not refresh prices.
+Watchlists, exports, and imports share a 1000-item capacity. Adds and imports that would
+exceed that capacity are rejected atomically; existing items and full backups remain intact.
+Imports skip normalized duplicates and do not refresh prices.
 Browser imports are limited to 1 MB. An import failure rolls back the entire merge.

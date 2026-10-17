@@ -77,8 +77,18 @@ export class Cs2CapClient {
       signal: AbortSignal.timeout(this.options.requestTimeoutMs ?? 10_000)
     });
 
-    const body = await response.text();
     const rateLimit = parseRateLimitHeaders(response.headers);
+    let body: string;
+    try {
+      body = await response.text();
+    } catch {
+      throw new Cs2CapError(
+        `CS2Cap response body could not be read (status ${response.status})`,
+        response.status,
+        "",
+        rateLimit
+      );
+    }
 
     if (!response.ok) {
       throw new Cs2CapError(

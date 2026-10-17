@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
   items,
   marketProviders,
@@ -8,6 +8,7 @@ import {
   watchlists
 } from "@csst/db";
 import type { Database } from "@csst/db";
+import { WATCHLIST_ITEM_LIMIT } from "@csst/shared";
 import type {
   ImportWatchlistResponse,
   ItemHistory,
@@ -130,34 +131,13 @@ export class WatchlistsRepository {
   }
 
   async addItem(marketHashName: string): Promise<WatchlistItem> {
-    await this.ensureDefaultWatchlist();
-
-    const normalizedMarketHashName = normalizeMarketHashName(marketHashName);
-    const item = await this.findOrCreateItem(marketHashName, normalizedMarketHashName);
-
-    const [watchlistItem] = await this.db
-      .insert(watchlistItems)
-      .values({
-        watchlistId: DEFAULT_WATCHLIST_ID,
-        itemId: item.id
-      })
-      .onConflictDoNothing()
-      .returning();
-
-    if (watchlistItem !== undefined) {
-      return {
-        id: watchlistItem.id,
-        item: {
-          id: item.id,
-          marketHashName: item.marketHashName,
-          imageUrl: item.imageUrl,
-          createdAt: item.createdAt.toISOString()
-        },
-        latestSnapshots: []
-      };
-    }
-
-    const existing = await this.getWatchlistEntries([item.id]);
+    await this.importItems([marketHashName]);
+    const [item] = await this.db
+      .select({ id: items.id })
+      .from(items)
+      .where(eq(items.normalizedMarketHashName, normalizeMarketHashName(marketHashName)))
+      .limit(1);
+    const existing = item === undefined ? [] : await this.getWatchlistEntries([item.id]);
     if (existing[0] === undefined) {
       throw new NotFoundException("Watchlist item not found after insert");
     }
@@ -181,8 +161,28 @@ export class WatchlistsRepository {
   async importItems(names: string[]): Promise<ImportWatchlistResponse> {
     await this.ensureDefaultWatchlist();
     return this.db.transaction(async (tx) => {
+      // Adds and merges share this lock so concurrent writes cannot exceed export capacity.
+      await tx
+        .select({ id: watchlists.id })
+        .from(watchlists)
+        .where(eq(watchlists.id, DEFAULT_WATCHLIST_ID))
+        .for("update");
       let added = 0;
       const unique = new Map(names.map((name) => [normalizeMarketHashName(name), name]));
+      const existing = await tx
+        .select({ normalized: items.normalizedMarketHashName })
+        .from(watchlistItems)
+        .innerJoin(items, eq(watchlistItems.itemId, items.id))
+        .where(eq(watchlistItems.watchlistId, DEFAULT_WATCHLIST_ID));
+      const known = new Set(existing.map((entry) => entry.normalized));
+      if (
+        existing.length + [...unique.keys()].filter((name) => !known.has(name)).length >
+        WATCHLIST_ITEM_LIMIT
+      ) {
+        throw new BadRequestException(
+          `Watchlist can contain at most ${WATCHLIST_ITEM_LIMIT} items; no items were added`
+        );
+      }
       for (const [normalized, name] of [...unique].sort(([left], [right]) =>
         left.localeCompare(right)
       )) {
@@ -252,6 +252,7 @@ export class WatchlistsRepository {
           itemId: input.itemId,
           marketHashName: input.marketHashName,
           status: "started",
+          startedAt: now,
           requestedItemCount: 1,
           requestCost: 1
         })

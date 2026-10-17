@@ -12,6 +12,7 @@ import type {
   Watchlist
 } from "@csst/shared";
 import type { WatchlistTransfer } from "@csst/shared";
+import { z } from "zod";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
@@ -47,7 +48,7 @@ export async function addWatchlistItem(request: AddWatchlistItemRequest): Promis
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to add item: ${response.status}`);
+    throw new Error(await getApiErrorMessage(response, `Failed to add item: ${response.status}`));
   }
 }
 
@@ -87,6 +88,18 @@ export async function importWatchlist(data: WatchlistTransfer) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   });
-  if (!response.ok) throw new Error(`Unable to import watchlist: ${response.status}`);
+  if (!response.ok)
+    throw new Error(
+      await getApiErrorMessage(response, `Unable to import watchlist: ${response.status}`)
+    );
   return importWatchlistResponseSchema.parse(await response.json());
+}
+
+async function getApiErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const parsed = z.object({ message: z.string() }).safeParse(await response.json());
+    return parsed.success ? parsed.data.message : fallback;
+  } catch {
+    return fallback;
+  }
 }

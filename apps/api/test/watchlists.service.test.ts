@@ -1,4 +1,4 @@
-import { Cs2CapError } from "@csst/cs2cap";
+import { Cs2CapClient, Cs2CapError } from "@csst/cs2cap";
 import { describe, expect, it, vi } from "vitest";
 import type { Cs2CapService } from "../src/cs2cap/cs2cap.service.js";
 import type { WatchlistsRepository } from "../src/watchlists/watchlists.repository.js";
@@ -46,6 +46,36 @@ function setup() {
 }
 
 describe("WatchlistsService refresh safety", () => {
+  it.each([401, 403, 429])(
+    "stops remaining items when an HTTP %i body read fails",
+    async (status) => {
+      const { service, provider, repository } = setup();
+      const client = new Cs2CapClient({
+        apiKey: "test",
+        fetchImpl: () =>
+          Promise.resolve(
+            new Response(
+              new ReadableStream({
+                start(controller) {
+                  controller.error(new Error("Connection lost after headers"));
+                }
+              }),
+              { status, headers: { "x-ratelimit-remaining": "0" } }
+            )
+          )
+      });
+      provider.listPrices.mockImplementation((marketHashName: string) =>
+        client.listPrices({ marketHashName })
+      );
+      const result = await service.refresh();
+      expect(result.itemResults.map((item) => item.status)).toEqual(["failed", "skipped"]);
+      expect(repository.reserveSyncRun).toHaveBeenCalledTimes(1);
+      expect(provider.listPrices).toHaveBeenCalledTimes(1);
+      expect(repository.finishSyncRun).toHaveBeenCalledWith(
+        expect.objectContaining({ responseStatus: status, rateLimitRemaining: 0 })
+      );
+    }
+  );
   it("skips unconfigured providers without reserving or spending requests", async () => {
     const { service, provider, repository } = setup();
     provider.isConfigured.mockReturnValue(false);
