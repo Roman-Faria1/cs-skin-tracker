@@ -16,6 +16,8 @@
 - Authentication/rate-limit responses stop the current refresh; sync-log finalization failures preserve saved snapshots and do not abort remaining items.
 - Completed `f94f0f3 fix: enforce atomic refresh budgets and cooldowns`.
 - Snapshot correctness slice: Postgres selects one latest row per item/provider with a deterministic tie-break; source freshness is `fresh`, `stale`, or `unknown` (24-hour threshold). UI comparisons exclude stale/unknown quotes. Migration `0002_snapshot_and_sync_indexes.sql` adds query indexes.
+- Snapshot correctness committed as `6ca7a9a`.
+- Integration tests use only `TEST_DATABASE_URL` (database name must end in `_test`). They delete fixture rows in that dedicated database. Without that variable they skip; CI provisions it and runs migrations twice, concurrent quota/cooldown tests, and uneven snapshot-history queries. Never point it at the app database.
 
 Recent commits:
 
@@ -131,7 +133,7 @@ Validated recently:
 - Typecheck passed.
 - Lint passed.
 - Format passed.
-- Tests passed: 4 files, 11 tests.
+- October 17, 2026: 32 tests passed, including 3 Postgres integration tests in the isolated `cs_skin_tracker_test` database. No provider requests were made.
 - Build passed. Next emits a warning that the Next ESLint plugin is not detected in the flat ESLint config; this is known and non-blocking.
 
 Docker validation already completed locally:
@@ -144,9 +146,9 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 
 ## Next Recommended Work
 
-1. Refresh safety committed; verify concurrency against real Postgres in the integration slice.
-2. Snapshot correctness implemented; verify query behavior against real Postgres in the integration slice.
-3. Add isolated Postgres integration tests and CI migration validation.
+1. Refresh safety committed; concurrent quota/cooldown behavior verified against Postgres.
+2. Snapshot correctness committed; uneven refresh histories verified against Postgres.
+3. Isolated Postgres integration tests and CI migration/build validation implemented and locally verified.
 4. Wire scheduled sync through the same protected refresh service, disabled by default.
 5. Add validated import/export without automatic provider calls.
 

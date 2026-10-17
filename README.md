@@ -17,7 +17,7 @@ Professional-grade personal dashboard for tracking CS2 skin prices, trends, and 
 2. Install dependencies: `corepack pnpm install`
 3. Copy env vars: `cp .env.example .env`
 4. Start local infra: `docker compose up -d`
-5. Generate/apply migrations: `corepack pnpm db:generate && corepack pnpm db:migrate`
+5. Apply checked-in migrations: `corepack pnpm db:migrate`
 6. Seed common providers and starter watchlist items: `corepack pnpm db:seed`
 7. Start API and web apps: `corepack pnpm dev`
 
@@ -41,3 +41,16 @@ machine-level Postgres on `5432`.
 - Shared request/response contracts live in `packages/shared`.
 - Database schema and migrations live in `packages/db`.
 - New behavior should include unit or integration tests appropriate to risk.
+
+## Database Tests
+
+Create a separate `cs_skin_tracker_test` database, then run:
+
+```bash
+TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5433/cs_skin_tracker_test corepack pnpm test
+```
+
+Integration tests require a database name ending in `_test` and clear fixture tables there.
+They apply checked-in migrations and verify concurrent quota/cooldown enforcement and latest-provider queries.
+Without `TEST_DATABASE_URL`, database tests skip. CI provisions a dedicated Postgres database and runs them.
+Use `db:generate` only after intentional schema changes, and commit the generated migration and metadata.
