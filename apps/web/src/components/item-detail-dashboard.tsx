@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { ItemHistory, PriceSnapshot } from "@csst/shared";
 
 import { fetchItemHistory } from "../lib/api";
+import {
+  getFreshnessLabel,
+  getLatestSnapshotsByProvider,
+  getLowestFreshAsk
+} from "../lib/snapshots";
 
 const chartWidth = 760;
 const chartHeight = 280;
@@ -39,8 +44,11 @@ export function ItemDetailDashboard({ itemId }: { itemId: string }) {
     [history]
   );
   const providers = useMemo(() => groupByProvider(pricedSnapshots), [pricedSnapshots]);
-  const latestByProvider = useMemo(() => getLatestByProvider(history?.snapshots ?? []), [history]);
-  const latestLowestAsk = useMemo(() => getLatestLowestAsk(history?.snapshots ?? []), [history]);
+  const latestByProvider = useMemo(
+    () => getLatestSnapshotsByProvider(history?.snapshots ?? []),
+    [history]
+  );
+  const latestLowestAsk = useMemo(() => getLowestFreshAsk(history?.snapshots ?? []), [history]);
 
   return (
     <main className="page">
@@ -58,7 +66,7 @@ export function ItemDetailDashboard({ itemId }: { itemId: string }) {
           </div>
           <div className="metric-strip">
             <div>
-              <span className="metric-label">Latest lowest ask</span>
+              <span className="metric-label">Lowest fresh ask</span>
               <strong>{latestLowestAsk === null ? "n/a" : formatCurrency(latestLowestAsk)}</strong>
             </div>
             <div>
@@ -105,10 +113,18 @@ export function ItemDetailDashboard({ itemId }: { itemId: string }) {
                       </span>
                     </div>
                     <div className="provider-meta">
-                      <span className={`status-badge ${snapshot.isStale ? "stale" : "fresh"}`}>
-                        {snapshot.isStale ? "Stale" : "Fresh"}
+                      <span className={`status-badge ${snapshot.freshness}`}>
+                        {getFreshnessLabel(snapshot)}
                       </span>
-                      <time className="provider-time">{formatDateTime(snapshot.collectedAt)}</time>
+                      <span className="provider-time">
+                        Source:{" "}
+                        {snapshot.sourceUpdatedAt === null
+                          ? "unknown"
+                          : formatDateTime(snapshot.sourceUpdatedAt)}
+                      </span>
+                      <time className="provider-time">
+                        Collected: {formatDateTime(snapshot.collectedAt)}
+                      </time>
                     </div>
                   </div>
                 ))}
@@ -275,27 +291,6 @@ function groupByProvider(snapshots: PriceSnapshot[]): Map<string, PriceSnapshot[
   }
 
   return groups;
-}
-
-function getLatestByProvider(snapshots: PriceSnapshot[]): PriceSnapshot[] {
-  const latest = new Map<string, PriceSnapshot>();
-  for (const snapshot of snapshots) {
-    latest.set(snapshot.provider, snapshot);
-  }
-
-  return Array.from(latest.values()).sort((left, right) =>
-    left.provider.localeCompare(right.provider)
-  );
-}
-
-function getLatestLowestAsk(snapshots: PriceSnapshot[]): number | null {
-  const latest = snapshots
-    .slice()
-    .reverse()
-    .map((snapshot) => snapshot.lowestAsk)
-    .find((price) => price !== null);
-
-  return latest ?? null;
 }
 
 function formatCurrency(value: number): string {

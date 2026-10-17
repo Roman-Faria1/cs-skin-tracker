@@ -30,6 +30,7 @@
 - [x] Atomic monthly budget reservations and per-item refresh cooldown.
 - [x] Provider timeouts and stop-on-auth/rate-limit behavior.
 - [x] Stale-data UI labels from persisted timestamps.
+- [x] Latest snapshot per item/provider and explicit unknown source freshness.
 - [ ] Scheduled worker sync for watched items.
 - [x] Provider comparison view.
 - [ ] Import/export watchlist.

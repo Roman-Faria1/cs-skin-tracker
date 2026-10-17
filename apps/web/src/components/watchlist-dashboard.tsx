@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import type { PriceSnapshot, Watchlist } from "@csst/shared";
 import { getRefreshStatusMessage } from "../lib/refresh-status";
+import { getFreshnessLabel, getLatestSnapshotsByProvider } from "../lib/snapshots";
 
 import {
   addWatchlistItem,
@@ -126,7 +127,7 @@ export function WatchlistDashboard() {
               <tr>
                 <th>Skin</th>
                 <th>Latest Providers</th>
-                <th>Best Market</th>
+                <th>Lowest Fresh Ask</th>
                 <th>Freshness</th>
                 <th>Action</th>
               </tr>
@@ -150,8 +151,9 @@ export function WatchlistDashboard() {
                         <div className="snapshot-list">
                           {latestSnapshots.slice(0, 5).map((snapshot) => (
                             <span
-                              className={`snapshot-pill ${snapshot.isStale ? "stale" : "fresh"}`}
+                              className={`snapshot-pill ${snapshot.freshness}`}
                               key={snapshot.id}
+                              title={`${getFreshnessLabel(snapshot)}; source: ${snapshot.sourceUpdatedAt ?? "unknown"}; collected: ${snapshot.collectedAt}`}
                             >
                               {snapshot.provider}:{" "}
                               {snapshot.lowestAsk === null
@@ -164,7 +166,7 @@ export function WatchlistDashboard() {
                     </td>
                     <td>
                       {comparison === null ? (
-                        <span className="muted">No priced providers</span>
+                        <span className="muted">No fresh priced providers</span>
                       ) : (
                         <div className="comparison-cell">
                           <strong>{comparison.cheapest.provider}</strong>
@@ -177,13 +179,14 @@ export function WatchlistDashboard() {
                     </td>
                     <td>
                       <span className={`status-badge ${getStatusClassName(newest)}`}>
-                        {newest === undefined
-                          ? "Not refreshed"
-                          : newest.isStale
-                            ? "Stale"
-                            : "Fresh"}
+                        {newest === undefined ? "Not refreshed" : getFreshnessLabel(newest)}
                       </span>
-                      <div className="muted">{newest?.collectedAt ?? ""}</div>
+                      {newest !== undefined ? (
+                        <>
+                          <div className="muted">Source: {newest.sourceUpdatedAt ?? "unknown"}</div>
+                          <div className="muted">Collected: {newest.collectedAt}</div>
+                        </>
+                      ) : null}
                     </td>
                     <td>
                       <a className="button secondary compact" href={`/items/${entry.item.id}`}>
@@ -221,18 +224,6 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   currency: "USD"
 });
 
-function getLatestSnapshotsByProvider(snapshots: PriceSnapshot[]): PriceSnapshot[] {
-  const latest = new Map<string, PriceSnapshot>();
-  for (const snapshot of snapshots) {
-    const current = latest.get(snapshot.provider);
-    if (current === undefined || compareCollectedAtDesc(snapshot, current) < 0) {
-      latest.set(snapshot.provider, snapshot);
-    }
-  }
-
-  return Array.from(latest.values()).sort(compareCollectedAtDesc);
-}
-
 interface ProviderComparison {
   cheapest: PriceSnapshot & { lowestAsk: number };
   mostExpensive: PriceSnapshot & { lowestAsk: number };
@@ -241,7 +232,8 @@ interface ProviderComparison {
 
 function getProviderComparison(snapshots: PriceSnapshot[]): ProviderComparison | null {
   const pricedSnapshots = snapshots.filter(
-    (snapshot): snapshot is PriceSnapshot & { lowestAsk: number } => snapshot.lowestAsk !== null
+    (snapshot): snapshot is PriceSnapshot & { lowestAsk: number } =>
+      snapshot.lowestAsk !== null && snapshot.freshness === "fresh"
   );
 
   if (pricedSnapshots.length === 0) {
@@ -271,9 +263,5 @@ function getStatusClassName(snapshot: PriceSnapshot | undefined): string {
     return "neutral";
   }
 
-  return snapshot.isStale ? "stale" : "fresh";
-}
-
-function compareCollectedAtDesc(left: PriceSnapshot, right: PriceSnapshot): number {
-  return Date.parse(right.collectedAt) - Date.parse(left.collectedAt);
+  return snapshot.freshness;
 }

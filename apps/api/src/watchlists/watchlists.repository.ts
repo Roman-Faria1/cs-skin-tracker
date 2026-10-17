@@ -12,12 +12,11 @@ import type { ItemHistory, PriceSnapshot, Watchlist, WatchlistItem } from "@csst
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { DATABASE } from "../db/db.module.js";
-import { parseNullableNumber } from "./watchlists.utils.js";
+import { getSnapshotFreshness, parseNullableNumber } from "./watchlists.utils.js";
 
 const DEFAULT_WATCHLIST_ID = "00000000-0000-4000-8000-000000000001";
 const DEFAULT_WATCHLIST_NAME = "Default";
 const CS2CAP_PROVIDER_ID = "cs2cap";
-const SNAPSHOTS_PER_ITEM = 10;
 
 export interface SnapshotInput {
   itemId: string;
@@ -335,7 +334,7 @@ export class WatchlistsRepository {
     }
 
     const rows = await this.db
-      .select({
+      .selectDistinctOn([priceSnapshots.itemId, priceSnapshots.providerId], {
         id: priceSnapshots.id,
         itemId: priceSnapshots.itemId,
         provider: priceSnapshots.providerId,
@@ -349,16 +348,17 @@ export class WatchlistsRepository {
       })
       .from(priceSnapshots)
       .where(inArray(priceSnapshots.itemId, itemIds))
-      .orderBy(desc(priceSnapshots.collectedAt))
-      .limit(Math.max(100, itemIds.length * SNAPSHOTS_PER_ITEM * 2));
+      .orderBy(
+        priceSnapshots.itemId,
+        priceSnapshots.providerId,
+        desc(priceSnapshots.collectedAt),
+        desc(priceSnapshots.id)
+      );
 
     const snapshotsByItem = new Map<string, PriceSnapshot[]>();
     for (const row of rows) {
       const existing = snapshotsByItem.get(row.itemId) ?? [];
-      if (existing.length >= SNAPSHOTS_PER_ITEM) {
-        continue;
-      }
-
+      const freshness = getSnapshotFreshness(row.collectedAt, row.sourceUpdatedAt);
       existing.push({
         id: row.id,
         itemId: row.itemId,
@@ -370,7 +370,8 @@ export class WatchlistsRepository {
         currency: "USD",
         sourceUpdatedAt: row.sourceUpdatedAt?.toISOString() ?? null,
         collectedAt: row.collectedAt.toISOString(),
-        isStale: isStale(row.collectedAt)
+        freshness,
+        isStale: freshness === "stale"
       });
       snapshotsByItem.set(row.itemId, existing);
     }
@@ -407,7 +408,8 @@ export class WatchlistsRepository {
       currency: "USD",
       sourceUpdatedAt: row.sourceUpdatedAt?.toISOString() ?? null,
       collectedAt: row.collectedAt.toISOString(),
-      isStale: isStale(row.collectedAt)
+      freshness: getSnapshotFreshness(row.collectedAt, row.sourceUpdatedAt),
+      isStale: getSnapshotFreshness(row.collectedAt, row.sourceUpdatedAt) === "stale"
     }));
   }
 }
@@ -418,9 +420,4 @@ export function normalizeMarketHashName(marketHashName: string): string {
 
 function formatNullableMoney(value: number | null): string | null {
   return value === null ? null : value.toFixed(2);
-}
-
-function isStale(collectedAt: Date): boolean {
-  const staleAfterMs = 1000 * 60 * 60 * 24;
-  return Date.now() - collectedAt.getTime() > staleAfterMs;
 }

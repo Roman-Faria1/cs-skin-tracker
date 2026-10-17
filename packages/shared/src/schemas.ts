@@ -30,6 +30,7 @@ export const priceSnapshotSchema = z.object({
   currency: z.literal("USD"),
   sourceUpdatedAt: z.string().datetime().nullable(),
   collectedAt: z.string().datetime(),
+  freshness: z.enum(["fresh", "stale", "unknown"]).default("unknown"),
   isStale: z.boolean()
 });
 

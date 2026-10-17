@@ -243,7 +243,9 @@ tr:last-child td {
   color: #8a4b0f;
 }
 
-.status-badge.neutral {
+.status-badge.neutral,
+.status-badge.unknown,
+.snapshot-pill.unknown {
   background: var(--surface-strong);
   color: var(--muted);
 }
@@ -421,7 +423,7 @@ tr:last-child td {
 .provider-time {
   color: var(--muted);
   font-size: 12px;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .detail-table {

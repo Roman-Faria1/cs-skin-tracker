@@ -14,6 +14,8 @@
 - Reservations remain charged if a process crashes or a request times out; this conservatively protects quota. Started rows are never automatically retried.
 - CS2Cap requests default to a 10-second timeout; per-item cooldown defaults to 3600 seconds. Configure with `CS2CAP_REQUEST_TIMEOUT_MS` and `CS2CAP_REFRESH_COOLDOWN_SECONDS`.
 - Authentication/rate-limit responses stop the current refresh; sync-log finalization failures preserve saved snapshots and do not abort remaining items.
+- Completed `f94f0f3 fix: enforce atomic refresh budgets and cooldowns`.
+- Snapshot correctness slice: Postgres selects one latest row per item/provider with a deterministic tie-break; source freshness is `fresh`, `stale`, or `unknown` (24-hour threshold). UI comparisons exclude stale/unknown quotes. Migration `0002_snapshot_and_sync_indexes.sql` adds query indexes.
 
 Recent commits:
 
@@ -142,8 +144,8 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 
 ## Next Recommended Work
 
-1. Complete refresh-safety verification and commit with conventional commits.
-2. Select latest prices per item/provider; distinguish source freshness from fetch time.
+1. Refresh safety committed; verify concurrency against real Postgres in the integration slice.
+2. Snapshot correctness implemented; verify query behavior against real Postgres in the integration slice.
 3. Add isolated Postgres integration tests and CI migration validation.
 4. Wire scheduled sync through the same protected refresh service, disabled by default.
 5. Add validated import/export without automatic provider calls.
