@@ -21,8 +21,14 @@ Professional-grade personal dashboard for tracking CS2 skin prices, trends, and 
 6. Seed common providers and starter watchlist items: `corepack pnpm db:seed`
 7. Start API and web apps: `corepack pnpm dev`
 
-The worker is scaffolded for later scheduled sync work and can be started separately with
-`corepack pnpm dev:worker` once Redis-backed jobs are wired into persistence.
+Scheduled collection is opt-in. Set `SYNC_ENABLED=true` and configure the same
+`INTERNAL_SYNC_TOKEN` (at least 32 random characters) on the API and worker, then run
+`corepack pnpm dev:worker` alongside the API. The worker loads the root `.env`.
+Default cadence is once every 24 hours; enabling it can run the first job immediately.
+Jobs call the token-protected `/internal/sync` endpoint and use the same Postgres quota
+reservations and item cooldowns as manual refreshes. Failed and stalled jobs are not retried.
+Stop the worker and set `SYNC_ENABLED=false` to disable collection; unset the API's internal
+token to disable the internal route as well. Existing scheduler metadata stays in Redis.
 
 Local Docker Postgres publishes on host port `5433` to avoid colliding with an existing
 machine-level Postgres on `5432`.
@@ -53,4 +59,5 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5433/cs_skin_tracker_
 Integration tests require a database name ending in `_test` and clear fixture tables there.
 They apply checked-in migrations and verify concurrent quota/cooldown enforcement and latest-provider queries.
 Without `TEST_DATABASE_URL`, database tests skip. CI provisions a dedicated Postgres database and runs them.
+Set `TEST_REDIS_URL=redis://127.0.0.1:6379` to include worker integration tests. These use uniquely named test queues and delete only those queues.
 Use `db:generate` only after intentional schema changes, and commit the generated migration and metadata.

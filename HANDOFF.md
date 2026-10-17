@@ -18,6 +18,9 @@
 - Snapshot correctness slice: Postgres selects one latest row per item/provider with a deterministic tie-break; source freshness is `fresh`, `stale`, or `unknown` (24-hour threshold). UI comparisons exclude stale/unknown quotes. Migration `0002_snapshot_and_sync_indexes.sql` adds query indexes.
 - Snapshot correctness committed as `6ca7a9a`.
 - Integration tests use only `TEST_DATABASE_URL` (database name must end in `_test`). They delete fixture rows in that dedicated database. Without that variable they skip; CI provisions it and runs migrations twice, concurrent quota/cooldown tests, and uneven snapshot-history queries. Never point it at the app database.
+- DB integration/CI coverage committed as `044b643`.
+- Worker now uses a BullMQ Job Scheduler and the API's protected `POST /internal/sync` route. Default `SYNC_ENABLED=false`; API/worker need matching `INTERNAL_SYNC_TOKEN` (32+ characters). Default cadence 24 hours, minimum 12. Enabling may trigger an immediate first sync. No job retries or stalled-job recovery; expired catch-up jobs skip. Stop all workers to disable execution; Redis retains scheduler metadata.
+- Worker tests use mocked API responses; `TEST_REDIS_URL` enables a real Redis queue/scheduler test. The full suite passed 42 tests with Postgres and Redis enabled. No CS2Cap calls are required.
 
 Recent commits:
 
@@ -149,7 +152,7 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 1. Refresh safety committed; concurrent quota/cooldown behavior verified against Postgres.
 2. Snapshot correctness committed; uneven refresh histories verified against Postgres.
 3. Isolated Postgres integration tests and CI migration/build validation implemented and locally verified.
-4. Wire scheduled sync through the same protected refresh service, disabled by default.
+4. Scheduled sync and endpoint authorization implemented, disabled by default; Redis integration verified.
 5. Add validated import/export without automatic provider calls.
 
 Keep this section updated at each completed slice. No real CS2Cap requests should be needed for automated tests.

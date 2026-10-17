@@ -32,7 +32,7 @@
 - [x] Stale-data UI labels from persisted timestamps.
 - [x] Latest snapshot per item/provider and explicit unknown source freshness.
 - [x] Postgres integration tests and CI migration validation.
-- [ ] Scheduled worker sync for watched items.
+- [x] Opt-in scheduled worker sync for watched items through protected API.
 - [x] Provider comparison view.
 - [ ] Import/export watchlist.
 

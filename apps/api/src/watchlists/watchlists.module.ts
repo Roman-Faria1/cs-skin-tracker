@@ -5,10 +5,11 @@ import { DbModule } from "../db/db.module.js";
 import { WatchlistsController } from "./watchlists.controller.js";
 import { WatchlistsRepository } from "./watchlists.repository.js";
 import { WatchlistsService } from "./watchlists.service.js";
+import { InternalSyncController } from "./internal-sync.controller.js";
 
 @Module({
   imports: [Cs2CapModule, DbModule],
-  controllers: [WatchlistsController],
+  controllers: [WatchlistsController, InternalSyncController],
   providers: [WatchlistsRepository, WatchlistsService]
 })
 export class WatchlistsModule {}

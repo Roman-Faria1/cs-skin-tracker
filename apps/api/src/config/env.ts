@@ -8,6 +8,7 @@ loadDotEnv();
 const apiEnvSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
   WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
+  INTERNAL_SYNC_TOKEN: z.union([z.literal(""), z.string().min(32)]).default(""),
   DATABASE_URL: z
     .string()
     .url()
@@ -34,6 +35,7 @@ export function loadApiEnv() {
   return {
     port: parsed.API_PORT,
     webOrigin: parsed.WEB_ORIGIN,
+    internalSyncToken: parsed.INTERNAL_SYNC_TOKEN,
     databaseUrl: parsed.DATABASE_URL,
     cs2capApiKey: parsed.CS2CAP_API_KEY,
     cs2capBaseUrl: parsed.CS2CAP_BASE_URL,
