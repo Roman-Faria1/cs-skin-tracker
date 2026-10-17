@@ -55,6 +55,23 @@ export const addWatchlistItemRequestSchema = z.object({
   marketHashName: marketHashNameSchema
 });
 
+export const watchlistTransferSchema = z
+  .object({
+    version: z.literal(1),
+    items: z.array(marketHashNameSchema)
+  })
+  .strict();
+
+export const watchlistImportSchema = watchlistTransferSchema.extend({
+  items: z.array(marketHashNameSchema).max(1000)
+});
+
+export const importWatchlistResponseSchema = z.object({
+  added: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative()
+});
+
 export const refreshWatchlistRequestSchema = z.object({
   itemIds: z.array(z.string().uuid()).min(1).max(100).optional()
 });
@@ -82,6 +99,8 @@ export type Watchlist = z.infer<typeof watchlistSchema>;
 export type WatchlistItem = z.infer<typeof watchlistItemSchema>;
 export type ItemHistory = z.infer<typeof itemHistorySchema>;
 export type AddWatchlistItemRequest = z.infer<typeof addWatchlistItemRequestSchema>;
+export type WatchlistTransfer = z.infer<typeof watchlistTransferSchema>;
+export type ImportWatchlistResponse = z.infer<typeof importWatchlistResponseSchema>;
 export type RefreshWatchlistRequest = z.infer<typeof refreshWatchlistRequestSchema>;
 export type RefreshWatchlistItemResult = z.infer<typeof refreshWatchlistItemResultSchema>;
 export type RefreshWatchlistResponse = z.infer<typeof refreshWatchlistResponseSchema>;

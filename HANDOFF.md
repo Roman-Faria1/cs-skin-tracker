@@ -21,6 +21,8 @@
 - DB integration/CI coverage committed as `044b643`.
 - Worker now uses a BullMQ Job Scheduler and the API's protected `POST /internal/sync` route. Default `SYNC_ENABLED=false`; API/worker need matching `INTERNAL_SYNC_TOKEN` (32+ characters). Default cadence 24 hours, minimum 12. Enabling may trigger an immediate first sync. No job retries or stalled-job recovery; expired catch-up jobs skip. Stop all workers to disable execution; Redis retains scheduler metadata.
 - Worker tests use mocked API responses; `TEST_REDIS_URL` enables a real Redis queue/scheduler test. The full suite passed 42 tests with Postgres and Redis enabled. No CS2Cap calls are required.
+- Scheduled collection committed as `dd8e4c2`.
+- Watchlist transfer implemented: `GET /watchlists/default/export` and `POST /watchlists/default/import`, version 1 JSON `{ "version": 1, "items": ["market hash name"] }`. Up to 1000 names, browser file limit 1 MB. Imports merge atomically, normalize duplicates, preserve existing canonical names, and never request prices. UI has import/download controls.
 
 Recent commits:
 
@@ -35,7 +37,7 @@ a8fbd55 docs: add project handoff notes
 
 ## Local Setup
 
-Use Node 20 if available:
+Use Node 22 (also used by CI):
 
 ```bash
 nvm use
@@ -153,7 +155,7 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 2. Snapshot correctness committed; uneven refresh histories verified against Postgres.
 3. Isolated Postgres integration tests and CI migration/build validation implemented and locally verified.
 4. Scheduled sync and endpoint authorization implemented, disabled by default; Redis integration verified.
-5. Add validated import/export without automatic provider calls.
+5. Watchlist import/export implemented; finish full verification, local smoke check, and final review.
 
 Keep this section updated at each completed slice. No real CS2Cap requests should be needed for automated tests.
 

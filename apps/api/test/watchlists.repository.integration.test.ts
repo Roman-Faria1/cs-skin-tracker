@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { createDb, items, priceSnapshots, syncRuns, watchlistItems } from "@csst/db";
 import type { Database } from "@csst/db";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { WatchlistsRepository } from "../src/watchlists/watchlists.repository.js";
 import type { SnapshotInput } from "../src/watchlists/watchlists.repository.js";
@@ -137,5 +138,49 @@ describe.skipIf(!testUrl)("WatchlistsRepository with Postgres", () => {
     );
     expect(quietSnapshots).toEqual([expect.objectContaining({ provider: "steam", lowestAsk: 30 })]);
     expect((await repository.getItemHistory(frequent.item.id)).snapshots).toHaveLength(123);
+  });
+
+  it("merges imports without duplicates and retains existing canonical names", async () => {
+    await repository.addItem("AK-47 | Redline (Field-Tested)");
+    expect(
+      await repository.importItems([
+        "ak-47 | redline (field-tested)",
+        "AWP | Asiimov (Field-Tested)",
+        "AWP   | Asiimov (Field-Tested)"
+      ])
+    ).toEqual({ added: 1, skipped: 2, total: 2 });
+    expect(await repository.importItems(["AWP | Asiimov (Field-Tested)"])).toEqual({
+      added: 0,
+      skipped: 1,
+      total: 2
+    });
+    const watchlist = await repository.getDefaultWatchlist();
+    expect(
+      watchlist.items.find((entry) => entry.item.marketHashName.startsWith("AK-47"))
+    ).toBeDefined();
+    expect(await repository.getMonthlyRequestUsage()).toBe(0);
+  });
+
+  it("deduplicates concurrent adds of the same normalized item", async () => {
+    const added = await Promise.all(
+      Array.from({ length: 6 }, (_, i) => repository.addItem(i % 2 ? "Test Skin" : "test skin"))
+    );
+    expect(new Set(added.map((entry) => entry.item.id)).size).toBe(1);
+    expect((await repository.getDefaultWatchlist()).items).toHaveLength(1);
+  });
+
+  it("rolls back the entire import if a later item fails", async () => {
+    await db.execute(
+      sql`alter table items add constraint test_rejected_skin check (market_hash_name <> 'ZZZ Rejected Skin')`
+    );
+    try {
+      await expect(
+        repository.importItems(["AAA Valid Skin", "ZZZ Rejected Skin"])
+      ).rejects.toThrow();
+      expect((await repository.getDefaultWatchlist()).items).toHaveLength(0);
+      expect(await db.select().from(items)).toHaveLength(0);
+    } finally {
+      await db.execute(sql`alter table items drop constraint test_rejected_skin`);
+    }
   });
 });

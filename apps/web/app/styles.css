@@ -81,7 +81,12 @@ h1 {
 .toolbar {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
+}
+
+.watchlist-transfer {
+  margin-bottom: 12px;
 }
 
 .form {
@@ -154,7 +159,7 @@ h1 {
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow);
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 table {
@@ -181,6 +186,10 @@ th {
 .watchlist-table th:nth-child(3),
 .watchlist-table td:nth-child(3) {
   min-width: 180px;
+}
+
+.watchlist-table table {
+  min-width: 980px;
 }
 
 tr:last-child td {

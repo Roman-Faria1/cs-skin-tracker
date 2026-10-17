@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { addWatchlistItemRequestSchema, refreshWatchlistResponseSchema } from "../src/index.js";
+import {
+  addWatchlistItemRequestSchema,
+  refreshWatchlistResponseSchema,
+  watchlistImportSchema
+} from "../src/index.js";
 
 describe("shared schemas", () => {
   it("trims valid market hash names", () => {
@@ -24,5 +28,15 @@ describe("shared schemas", () => {
 
     expect(parsed.failedItems).toBe(0);
     expect(parsed.itemResults).toEqual([]);
+  });
+
+  it("rejects unsupported transfer versions and oversized item lists", () => {
+    expect(() => watchlistImportSchema.parse({ version: 2, items: [] })).toThrow();
+    expect(() =>
+      watchlistImportSchema.parse({
+        version: 1,
+        items: Array.from({ length: 1001 }, () => "AK-47 | Redline")
+      })
+    ).toThrow();
   });
 });

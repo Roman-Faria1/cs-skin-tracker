@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import type { PriceSnapshot, Watchlist } from "@csst/shared";
 import { getRefreshStatusMessage } from "../lib/refresh-status";
 import { getFreshnessLabel, getLatestSnapshotsByProvider } from "../lib/snapshots";
+import { parseWatchlistFile } from "../lib/watchlist-transfer";
 
 import {
   addWatchlistItem,
+  exportWatchlist,
   fetchWatchlist,
+  importWatchlist,
   refreshWatchlist,
   removeWatchlistItem
 } from "../lib/api";
@@ -18,6 +21,7 @@ export function WatchlistDashboard() {
   const [marketHashName, setMarketHashName] = useState("");
   const [status, setStatus] = useState("Loading watchlist...");
   const [isBusy, setIsBusy] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const itemCount = watchlist?.items.length ?? 0;
   const snapshotCount = useMemo(
@@ -81,6 +85,45 @@ export function WatchlistDashboard() {
     }
   }
 
+  async function handleImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (file === undefined) return;
+    setIsBusy(true);
+    setStatus("Importing watchlist...");
+    try {
+      const result = await importWatchlist(await parseWatchlistFile(file));
+      await loadWatchlist(`Imported ${result.added} items; ${result.skipped} duplicates skipped.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to import watchlist.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleExport() {
+    setIsBusy(true);
+    setStatus("Exporting watchlist...");
+    try {
+      const data = await exportWatchlist();
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "cs-skin-tracker-watchlist.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      setStatus(`Exported ${data.items.length} items.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to export watchlist.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   return (
     <main className="page">
       <div className="shell">
@@ -100,6 +143,7 @@ export function WatchlistDashboard() {
 
         <form className="form" onSubmit={(event) => void handleAdd(event)}>
           <input
+            aria-label="Market hash name"
             className="input"
             disabled={isBusy}
             onChange={(event) => setMarketHashName(event.target.value)}
@@ -119,7 +163,37 @@ export function WatchlistDashboard() {
           </button>
         </form>
 
-        <p className="status">{status}</p>
+        <div className="toolbar watchlist-transfer">
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".json,application/json"
+            hidden
+            disabled={isBusy}
+            onChange={(event) => void handleImport(event)}
+            aria-label="Watchlist JSON file"
+          />
+          <button
+            className="button secondary"
+            type="button"
+            disabled={isBusy}
+            onClick={() => fileInput.current?.click()}
+          >
+            Import Watchlist
+          </button>
+          <button
+            className="button secondary"
+            type="button"
+            disabled={isBusy || watchlist === null}
+            onClick={() => void handleExport()}
+          >
+            Export Watchlist
+          </button>
+        </div>
+
+        <p className="status" role="status" aria-live="polite">
+          {status}
+        </p>
 
         <section className="table-wrap watchlist-table" aria-label="Watchlist">
           <table>

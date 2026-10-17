@@ -33,6 +33,15 @@ export class WatchlistsService {
     return this.repository.removeItem(id);
   }
 
+  async exportWatchlist() {
+    const entries = await this.repository.getWatchlistEntries();
+    return { version: 1 as const, items: entries.map((entry) => entry.item.marketHashName) };
+  }
+
+  importWatchlist(names: string[]) {
+    return this.repository.importItems(names);
+  }
+
   async refresh(itemIds?: string[]): Promise<RefreshWatchlistResponse> {
     const selectedItems = await this.repository.getWatchlistEntries(itemIds);
     const itemResults: RefreshWatchlistResponse["itemResults"] = [];

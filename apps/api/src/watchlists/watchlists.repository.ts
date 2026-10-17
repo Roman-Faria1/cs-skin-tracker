@@ -8,7 +8,13 @@ import {
   watchlists
 } from "@csst/db";
 import type { Database } from "@csst/db";
-import type { ItemHistory, PriceSnapshot, Watchlist, WatchlistItem } from "@csst/shared";
+import type {
+  ImportWatchlistResponse,
+  ItemHistory,
+  PriceSnapshot,
+  Watchlist,
+  WatchlistItem
+} from "@csst/shared";
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { DATABASE } from "../db/db.module.js";
@@ -172,6 +178,30 @@ export class WatchlistsRepository {
     return { removed: true };
   }
 
+  async importItems(names: string[]): Promise<ImportWatchlistResponse> {
+    await this.ensureDefaultWatchlist();
+    return this.db.transaction(async (tx) => {
+      let added = 0;
+      const unique = new Map(names.map((name) => [normalizeMarketHashName(name), name]));
+      for (const [normalized, name] of [...unique].sort(([left], [right]) =>
+        left.localeCompare(right)
+      )) {
+        const item = await this.findOrCreateItem(name, normalized, tx);
+        const inserted = await tx
+          .insert(watchlistItems)
+          .values({ watchlistId: DEFAULT_WATCHLIST_ID, itemId: item.id })
+          .onConflictDoNothing()
+          .returning({ id: watchlistItems.id });
+        added += inserted.length;
+      }
+      const [count] = await tx
+        .select({ total: sql<number>`count(*)::int` })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, DEFAULT_WATCHLIST_ID));
+      return { added, skipped: names.length - added, total: count?.total ?? 0 };
+    });
+  }
+
   async ensureProvider(id: string, displayName = id): Promise<void> {
     await this.db
       .insert(marketProviders)
@@ -302,8 +332,12 @@ export class WatchlistsRepository {
       .onConflictDoNothing();
   }
 
-  private async findOrCreateItem(marketHashName: string, normalizedMarketHashName: string) {
-    const [existing] = await this.db
+  private async findOrCreateItem(
+    marketHashName: string,
+    normalizedMarketHashName: string,
+    db: Pick<Database, "select" | "insert"> = this.db
+  ) {
+    const [existing] = await db
       .select()
       .from(items)
       .where(eq(items.normalizedMarketHashName, normalizedMarketHashName))
@@ -313,19 +347,23 @@ export class WatchlistsRepository {
       return existing;
     }
 
-    const [created] = await this.db
+    const [created] = await db
       .insert(items)
       .values({
         marketHashName,
         normalizedMarketHashName
       })
+      .onConflictDoNothing()
       .returning();
 
-    if (created === undefined) {
-      throw new Error("Unable to create item");
-    }
-
-    return created;
+    if (created !== undefined) return created;
+    const [concurrent] = await db
+      .select()
+      .from(items)
+      .where(eq(items.normalizedMarketHashName, normalizedMarketHashName))
+      .limit(1);
+    if (concurrent === undefined) throw new Error("Unable to create item");
+    return concurrent;
   }
 
   private async getLatestSnapshots(itemIds: string[]): Promise<Map<string, PriceSnapshot[]>> {

@@ -34,7 +34,7 @@
 - [x] Postgres integration tests and CI migration validation.
 - [x] Opt-in scheduled worker sync for watched items through protected API.
 - [x] Provider comparison view.
-- [ ] Import/export watchlist.
+- [x] Versioned JSON watchlist import/export with atomic merging and validation.
 
 ## v0.3 - Alerts & Portfolio Features
 
