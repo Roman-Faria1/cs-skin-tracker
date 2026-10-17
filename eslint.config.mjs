@@ -8,6 +8,8 @@ export default tseslint.config(
       "**/dist/**",
       "**/.next/**",
       "**/coverage/**",
+      "**/test-results/**",
+      "**/playwright-report/**",
       "**/node_modules/**",
       "commitlint.config.cjs",
       "prettier.config.cjs",

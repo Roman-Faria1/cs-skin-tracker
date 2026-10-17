@@ -13,7 +13,7 @@ Professional-grade personal dashboard for tracking CS2 skin prices, trends, and 
 
 ## Getting Started
 
-1. Use Node 20: `nvm use`
+1. Use Node 22: `nvm install && nvm use`
 2. Install dependencies: `corepack pnpm install`
 3. Copy env vars: `cp .env.example .env`
 4. Start local infra: `docker compose up -d`
@@ -61,3 +61,17 @@ They apply checked-in migrations and verify concurrent quota/cooldown enforcemen
 Without `TEST_DATABASE_URL`, database tests skip. CI provisions a dedicated Postgres database and runs them.
 Set `TEST_REDIS_URL=redis://127.0.0.1:6379` to include worker integration tests. These use uniquely named test queues and delete only those queues.
 Use `db:generate` only after intentional schema changes, and commit the generated migration and metadata.
+
+## Browser Tests
+
+With Node 22 selected, run `corepack pnpm exec playwright install chromium` once,
+then `corepack pnpm build` and `corepack pnpm test:e2e`. The tests start the built frontend
+on port 3100, mock all market API responses, and verify watchlist transfers and freshness labels
+on desktop and mobile. They make no CS2Cap calls. Screenshots and failure traces go into `test-results`.
+
+## Watchlist Transfer
+
+Use Import Watchlist and Export Watchlist to transfer version 1 JSON files containing
+`{ "version": 1, "items": ["AK-47 | Redline (Field-Tested)"] }`.
+Imports merge up to 1000 names, skip normalized duplicates, and do not refresh prices.
+Browser imports are limited to 1 MB. An import failure rolls back the entire merge.
