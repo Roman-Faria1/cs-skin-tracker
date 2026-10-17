@@ -9,7 +9,8 @@ export class Cs2CapService {
   private readonly env = loadApiEnv();
   private readonly client = new Cs2CapClient({
     apiKey: this.env.cs2capApiKey,
-    baseUrl: this.env.cs2capBaseUrl
+    baseUrl: this.env.cs2capBaseUrl,
+    requestTimeoutMs: this.env.cs2capRequestTimeoutMs
   });
 
   async getBatchPrices(marketHashNames: string[]): Promise<BatchPriceResult> {
@@ -30,6 +31,10 @@ export class Cs2CapService {
 
   getMonthlyRequestLimit(): number {
     return this.env.cs2capMonthlyRequestLimit;
+  }
+
+  getRefreshCooldownSeconds(): number {
+    return this.env.cs2capRefreshCooldownSeconds;
   }
 
   isConfigured(): boolean {

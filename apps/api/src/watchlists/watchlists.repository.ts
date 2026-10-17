@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
   items,
   marketProviders,
@@ -8,16 +8,22 @@ import {
   watchlists
 } from "@csst/db";
 import type { Database } from "@csst/db";
-import type { ItemHistory, PriceSnapshot, Watchlist, WatchlistItem } from "@csst/shared";
+import { WATCHLIST_ITEM_LIMIT } from "@csst/shared";
+import type {
+  ImportWatchlistResponse,
+  ItemHistory,
+  PriceSnapshot,
+  Watchlist,
+  WatchlistItem
+} from "@csst/shared";
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { DATABASE } from "../db/db.module.js";
-import { parseNullableNumber } from "./watchlists.utils.js";
+import { getSnapshotFreshness, parseNullableNumber } from "./watchlists.utils.js";
 
 const DEFAULT_WATCHLIST_ID = "00000000-0000-4000-8000-000000000001";
 const DEFAULT_WATCHLIST_NAME = "Default";
 const CS2CAP_PROVIDER_ID = "cs2cap";
-const SNAPSHOTS_PER_ITEM = 10;
 
 export interface SnapshotInput {
   itemId: string;
@@ -33,11 +39,15 @@ export interface SnapshotInput {
 }
 
 export interface SyncRunInput {
-  itemId?: string | null;
-  marketHashName?: string | null;
-  requestedItemCount: number;
-  requestCost: number;
+  itemId: string;
+  marketHashName: string;
+  monthlyLimit: number;
+  cooldownSeconds: number;
 }
+
+export type SyncReservation =
+  | { status: "reserved"; id: string }
+  | { status: "skipped"; reason: string };
 
 export interface FinishSyncRunInput {
   id: string;
@@ -121,34 +131,13 @@ export class WatchlistsRepository {
   }
 
   async addItem(marketHashName: string): Promise<WatchlistItem> {
-    await this.ensureDefaultWatchlist();
-
-    const normalizedMarketHashName = normalizeMarketHashName(marketHashName);
-    const item = await this.findOrCreateItem(marketHashName, normalizedMarketHashName);
-
-    const [watchlistItem] = await this.db
-      .insert(watchlistItems)
-      .values({
-        watchlistId: DEFAULT_WATCHLIST_ID,
-        itemId: item.id
-      })
-      .onConflictDoNothing()
-      .returning();
-
-    if (watchlistItem !== undefined) {
-      return {
-        id: watchlistItem.id,
-        item: {
-          id: item.id,
-          marketHashName: item.marketHashName,
-          imageUrl: item.imageUrl,
-          createdAt: item.createdAt.toISOString()
-        },
-        latestSnapshots: []
-      };
-    }
-
-    const existing = await this.getWatchlistEntries([item.id]);
+    await this.importItems([marketHashName]);
+    const [item] = await this.db
+      .select({ id: items.id })
+      .from(items)
+      .where(eq(items.normalizedMarketHashName, normalizeMarketHashName(marketHashName)))
+      .limit(1);
+    const existing = item === undefined ? [] : await this.getWatchlistEntries([item.id]);
     if (existing[0] === undefined) {
       throw new NotFoundException("Watchlist item not found after insert");
     }
@@ -169,6 +158,50 @@ export class WatchlistsRepository {
     return { removed: true };
   }
 
+  async importItems(names: string[]): Promise<ImportWatchlistResponse> {
+    await this.ensureDefaultWatchlist();
+    return this.db.transaction(async (tx) => {
+      // Adds and merges share this lock so concurrent writes cannot exceed export capacity.
+      await tx
+        .select({ id: watchlists.id })
+        .from(watchlists)
+        .where(eq(watchlists.id, DEFAULT_WATCHLIST_ID))
+        .for("update");
+      let added = 0;
+      const unique = new Map(names.map((name) => [normalizeMarketHashName(name), name]));
+      const existing = await tx
+        .select({ normalized: items.normalizedMarketHashName })
+        .from(watchlistItems)
+        .innerJoin(items, eq(watchlistItems.itemId, items.id))
+        .where(eq(watchlistItems.watchlistId, DEFAULT_WATCHLIST_ID));
+      const known = new Set(existing.map((entry) => entry.normalized));
+      if (
+        existing.length + [...unique.keys()].filter((name) => !known.has(name)).length >
+        WATCHLIST_ITEM_LIMIT
+      ) {
+        throw new BadRequestException(
+          `Watchlist can contain at most ${WATCHLIST_ITEM_LIMIT} items; no items were added`
+        );
+      }
+      for (const [normalized, name] of [...unique].sort(([left], [right]) =>
+        left.localeCompare(right)
+      )) {
+        const item = await this.findOrCreateItem(name, normalized, tx);
+        const inserted = await tx
+          .insert(watchlistItems)
+          .values({ watchlistId: DEFAULT_WATCHLIST_ID, itemId: item.id })
+          .onConflictDoNothing()
+          .returning({ id: watchlistItems.id });
+        added += inserted.length;
+      }
+      const [count] = await tx
+        .select({ total: sql<number>`count(*)::int` })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, DEFAULT_WATCHLIST_ID));
+      return { added, skipped: names.length - added, total: count?.total ?? 0 };
+    });
+  }
+
   async ensureProvider(id: string, displayName = id): Promise<void> {
     await this.db
       .insert(marketProviders)
@@ -179,26 +212,54 @@ export class WatchlistsRepository {
       .onConflictDoNothing();
   }
 
-  async createSyncRun(input: SyncRunInput): Promise<string> {
+  async reserveSyncRun(input: SyncRunInput): Promise<SyncReservation> {
     await this.ensureProvider(CS2CAP_PROVIDER_ID, "CS2Cap");
-
-    const [syncRun] = await this.db
-      .insert(syncRuns)
-      .values({
-        providerId: CS2CAP_PROVIDER_ID,
-        itemId: input.itemId ?? null,
-        marketHashName: input.marketHashName ?? null,
-        status: "started",
-        requestedItemCount: input.requestedItemCount,
-        requestCost: input.requestCost
-      })
-      .returning({ id: syncRuns.id });
-
-    if (syncRun === undefined) {
-      throw new Error("Unable to create sync run");
-    }
-
-    return syncRun.id;
+    return this.db.transaction(async (tx) => {
+      // Serialize quota checks and reservations across API instances and worker jobs.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('csst:cs2cap:budget'))`);
+      const now = new Date();
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const [usage] = await tx
+        .select({ used: sql<number>`coalesce(sum(${syncRuns.requestCost}), 0)::int` })
+        .from(syncRuns)
+        .where(
+          and(eq(syncRuns.providerId, CS2CAP_PROVIDER_ID), gte(syncRuns.startedAt, monthStart))
+        );
+      if ((usage?.used ?? 0) >= input.monthlyLimit) {
+        return { status: "skipped", reason: "CS2Cap monthly request budget is exhausted" };
+      }
+      const [recent] = await tx
+        .select({ id: syncRuns.id })
+        .from(syncRuns)
+        .where(
+          and(
+            eq(syncRuns.providerId, CS2CAP_PROVIDER_ID),
+            eq(syncRuns.itemId, input.itemId),
+            gte(syncRuns.startedAt, new Date(now.getTime() - input.cooldownSeconds * 1000))
+          )
+        )
+        .limit(1);
+      if (recent !== undefined) {
+        return {
+          status: "skipped",
+          reason: "Item refresh cooldown is active; cached prices retained"
+        };
+      }
+      const [syncRun] = await tx
+        .insert(syncRuns)
+        .values({
+          providerId: CS2CAP_PROVIDER_ID,
+          itemId: input.itemId,
+          marketHashName: input.marketHashName,
+          status: "started",
+          startedAt: now,
+          requestedItemCount: 1,
+          requestCost: 1
+        })
+        .returning({ id: syncRuns.id });
+      if (syncRun === undefined) throw new Error("Unable to reserve sync run");
+      return { status: "reserved", id: syncRun.id };
+    });
   }
 
   async finishSyncRun(input: FinishSyncRunInput): Promise<void> {
@@ -257,7 +318,7 @@ export class WatchlistsRepository {
         used: sql<number>`coalesce(sum(${syncRuns.requestCost}), 0)::int`
       })
       .from(syncRuns)
-      .where(gte(syncRuns.startedAt, monthStart));
+      .where(and(eq(syncRuns.providerId, CS2CAP_PROVIDER_ID), gte(syncRuns.startedAt, monthStart)));
 
     return usage?.used ?? 0;
   }
@@ -272,8 +333,12 @@ export class WatchlistsRepository {
       .onConflictDoNothing();
   }
 
-  private async findOrCreateItem(marketHashName: string, normalizedMarketHashName: string) {
-    const [existing] = await this.db
+  private async findOrCreateItem(
+    marketHashName: string,
+    normalizedMarketHashName: string,
+    db: Pick<Database, "select" | "insert"> = this.db
+  ) {
+    const [existing] = await db
       .select()
       .from(items)
       .where(eq(items.normalizedMarketHashName, normalizedMarketHashName))
@@ -283,19 +348,23 @@ export class WatchlistsRepository {
       return existing;
     }
 
-    const [created] = await this.db
+    const [created] = await db
       .insert(items)
       .values({
         marketHashName,
         normalizedMarketHashName
       })
+      .onConflictDoNothing()
       .returning();
 
-    if (created === undefined) {
-      throw new Error("Unable to create item");
-    }
-
-    return created;
+    if (created !== undefined) return created;
+    const [concurrent] = await db
+      .select()
+      .from(items)
+      .where(eq(items.normalizedMarketHashName, normalizedMarketHashName))
+      .limit(1);
+    if (concurrent === undefined) throw new Error("Unable to create item");
+    return concurrent;
   }
 
   private async getLatestSnapshots(itemIds: string[]): Promise<Map<string, PriceSnapshot[]>> {
@@ -304,7 +373,7 @@ export class WatchlistsRepository {
     }
 
     const rows = await this.db
-      .select({
+      .selectDistinctOn([priceSnapshots.itemId, priceSnapshots.providerId], {
         id: priceSnapshots.id,
         itemId: priceSnapshots.itemId,
         provider: priceSnapshots.providerId,
@@ -318,16 +387,17 @@ export class WatchlistsRepository {
       })
       .from(priceSnapshots)
       .where(inArray(priceSnapshots.itemId, itemIds))
-      .orderBy(desc(priceSnapshots.collectedAt))
-      .limit(Math.max(100, itemIds.length * SNAPSHOTS_PER_ITEM * 2));
+      .orderBy(
+        priceSnapshots.itemId,
+        priceSnapshots.providerId,
+        desc(priceSnapshots.collectedAt),
+        desc(priceSnapshots.id)
+      );
 
     const snapshotsByItem = new Map<string, PriceSnapshot[]>();
     for (const row of rows) {
       const existing = snapshotsByItem.get(row.itemId) ?? [];
-      if (existing.length >= SNAPSHOTS_PER_ITEM) {
-        continue;
-      }
-
+      const freshness = getSnapshotFreshness(row.collectedAt, row.sourceUpdatedAt);
       existing.push({
         id: row.id,
         itemId: row.itemId,
@@ -339,7 +409,8 @@ export class WatchlistsRepository {
         currency: "USD",
         sourceUpdatedAt: row.sourceUpdatedAt?.toISOString() ?? null,
         collectedAt: row.collectedAt.toISOString(),
-        isStale: isStale(row.collectedAt)
+        freshness,
+        isStale: freshness === "stale"
       });
       snapshotsByItem.set(row.itemId, existing);
     }
@@ -376,7 +447,8 @@ export class WatchlistsRepository {
       currency: "USD",
       sourceUpdatedAt: row.sourceUpdatedAt?.toISOString() ?? null,
       collectedAt: row.collectedAt.toISOString(),
-      isStale: isStale(row.collectedAt)
+      freshness: getSnapshotFreshness(row.collectedAt, row.sourceUpdatedAt),
+      isStale: getSnapshotFreshness(row.collectedAt, row.sourceUpdatedAt) === "stale"
     }));
   }
 }
@@ -387,9 +459,4 @@ export function normalizeMarketHashName(marketHashName: string): string {
 
 function formatNullableMoney(value: number | null): string | null {
   return value === null ? null : value.toFixed(2);
-}
-
-function isStale(collectedAt: Date): boolean {
-  const staleAfterMs = 1000 * 60 * 60 * 24;
-  return Date.now() - collectedAt.getTime() > staleAfterMs;
 }

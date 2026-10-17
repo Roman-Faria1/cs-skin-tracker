@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   integer,
+  index,
   jsonb,
   numeric,
   pgEnum,
@@ -75,43 +76,61 @@ export const watchlistItems = pgTable(
   })
 );
 
-export const priceSnapshots = pgTable("price_snapshots", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  itemId: uuid("item_id")
-    .notNull()
-    .references(() => items.id, { onDelete: "cascade" }),
-  providerId: text("provider_id")
-    .notNull()
-    .references(() => marketProviders.id),
-  lowestAsk: numeric("lowest_ask", { precision: 12, scale: 2 }),
-  highestBid: numeric("highest_bid", { precision: 12, scale: 2 }),
-  askVolume: integer("ask_volume"),
-  bidVolume: integer("bid_volume"),
-  currency: text("currency").notNull().default("USD"),
-  rawPayload: jsonb("raw_payload")
-    .notNull()
-    .default(sql`'{}'::jsonb`),
-  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
-  collectedAt: timestamp("collected_at", { withTimezone: true }).defaultNow().notNull()
-});
+export const priceSnapshots = pgTable(
+  "price_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    providerId: text("provider_id")
+      .notNull()
+      .references(() => marketProviders.id),
+    lowestAsk: numeric("lowest_ask", { precision: 12, scale: 2 }),
+    highestBid: numeric("highest_bid", { precision: 12, scale: 2 }),
+    askVolume: integer("ask_volume"),
+    bidVolume: integer("bid_volume"),
+    currency: text("currency").notNull().default("USD"),
+    rawPayload: jsonb("raw_payload")
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+    collectedAt: timestamp("collected_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    latestPriceIdx: index("price_snapshots_latest_idx").on(
+      table.itemId,
+      table.providerId,
+      table.collectedAt.desc(),
+      table.id.desc()
+    )
+  })
+);
 
-export const syncRuns = pgTable("sync_runs", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  providerId: text("provider_id").references(() => marketProviders.id),
-  itemId: uuid("item_id").references(() => items.id, { onDelete: "set null" }),
-  marketHashName: text("market_hash_name"),
-  status: syncStatusEnum("status").notNull(),
-  requestedItemCount: integer("requested_item_count").default(0).notNull(),
-  snapshotsCreated: integer("snapshots_created").default(0).notNull(),
-  requestCost: integer("request_cost").default(1).notNull(),
-  responseStatus: integer("response_status"),
-  rateLimitLimit: integer("rate_limit_limit"),
-  rateLimitRemaining: integer("rate_limit_remaining"),
-  rateLimitResetAt: timestamp("rate_limit_reset_at", { withTimezone: true }),
-  errorMessage: text("error_message"),
-  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
-  finishedAt: timestamp("finished_at", { withTimezone: true })
-});
+export const syncRuns = pgTable(
+  "sync_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    providerId: text("provider_id").references(() => marketProviders.id),
+    itemId: uuid("item_id").references(() => items.id, { onDelete: "set null" }),
+    marketHashName: text("market_hash_name"),
+    status: syncStatusEnum("status").notNull(),
+    requestedItemCount: integer("requested_item_count").default(0).notNull(),
+    snapshotsCreated: integer("snapshots_created").default(0).notNull(),
+    requestCost: integer("request_cost").default(1).notNull(),
+    responseStatus: integer("response_status"),
+    rateLimitLimit: integer("rate_limit_limit"),
+    rateLimitRemaining: integer("rate_limit_remaining"),
+    rateLimitResetAt: timestamp("rate_limit_reset_at", { withTimezone: true }),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true })
+  },
+  (table) => ({
+    budgetIdx: index("sync_runs_budget_idx").on(table.providerId, table.startedAt),
+    cooldownIdx: index("sync_runs_cooldown_idx").on(table.providerId, table.itemId, table.startedAt)
+  })
+);
 
 export const alerts = pgTable("alerts", {
   id: uuid("id").defaultRandom().primaryKey(),

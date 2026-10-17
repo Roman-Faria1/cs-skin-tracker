@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const WATCHLIST_ITEM_LIMIT = 1000;
+
 export const marketHashNameSchema = z
   .string()
   .trim()
@@ -30,6 +32,7 @@ export const priceSnapshotSchema = z.object({
   currency: z.literal("USD"),
   sourceUpdatedAt: z.string().datetime().nullable(),
   collectedAt: z.string().datetime(),
+  freshness: z.enum(["fresh", "stale", "unknown"]).default("unknown"),
   isStale: z.boolean()
 });
 
@@ -52,6 +55,21 @@ export const itemHistorySchema = z.object({
 
 export const addWatchlistItemRequestSchema = z.object({
   marketHashName: marketHashNameSchema
+});
+
+export const watchlistTransferSchema = z
+  .object({
+    version: z.literal(1),
+    items: z.array(marketHashNameSchema).max(WATCHLIST_ITEM_LIMIT)
+  })
+  .strict();
+
+export const watchlistImportSchema = watchlistTransferSchema;
+
+export const importWatchlistResponseSchema = z.object({
+  added: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative()
 });
 
 export const refreshWatchlistRequestSchema = z.object({
@@ -81,6 +99,8 @@ export type Watchlist = z.infer<typeof watchlistSchema>;
 export type WatchlistItem = z.infer<typeof watchlistItemSchema>;
 export type ItemHistory = z.infer<typeof itemHistorySchema>;
 export type AddWatchlistItemRequest = z.infer<typeof addWatchlistItemRequestSchema>;
+export type WatchlistTransfer = z.infer<typeof watchlistTransferSchema>;
+export type ImportWatchlistResponse = z.infer<typeof importWatchlistResponseSchema>;
 export type RefreshWatchlistRequest = z.infer<typeof refreshWatchlistRequestSchema>;
 export type RefreshWatchlistItemResult = z.infer<typeof refreshWatchlistItemResultSchema>;
 export type RefreshWatchlistResponse = z.infer<typeof refreshWatchlistResponseSchema>;

@@ -1,10 +1,18 @@
-import { itemHistorySchema, refreshWatchlistResponseSchema, watchlistSchema } from "@csst/shared";
+import {
+  importWatchlistResponseSchema,
+  itemHistorySchema,
+  refreshWatchlistResponseSchema,
+  watchlistSchema,
+  watchlistTransferSchema
+} from "@csst/shared";
 import type {
   AddWatchlistItemRequest,
   ItemHistory,
   RefreshWatchlistResponse,
   Watchlist
 } from "@csst/shared";
+import type { WatchlistTransfer } from "@csst/shared";
+import { z } from "zod";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
@@ -40,7 +48,7 @@ export async function addWatchlistItem(request: AddWatchlistItemRequest): Promis
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to add item: ${response.status}`);
+    throw new Error(await getApiErrorMessage(response, `Failed to add item: ${response.status}`));
   }
 }
 
@@ -66,4 +74,32 @@ export async function refreshWatchlist(): Promise<RefreshWatchlistResponse> {
   }
 
   return refreshWatchlistResponseSchema.parse(await response.json());
+}
+
+export async function exportWatchlist(): Promise<WatchlistTransfer> {
+  const response = await fetch(`${apiBaseUrl}/watchlists/default/export`, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Unable to export watchlist: ${response.status}`);
+  return watchlistTransferSchema.parse(await response.json());
+}
+
+export async function importWatchlist(data: WatchlistTransfer) {
+  const response = await fetch(`${apiBaseUrl}/watchlists/default/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+  if (!response.ok)
+    throw new Error(
+      await getApiErrorMessage(response, `Unable to import watchlist: ${response.status}`)
+    );
+  return importWatchlistResponseSchema.parse(await response.json());
+}
+
+async function getApiErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const parsed = z.object({ message: z.string() }).safeParse(await response.json());
+    return parsed.success ? parsed.data.message : fallback;
+  } catch {
+    return fallback;
+  }
 }

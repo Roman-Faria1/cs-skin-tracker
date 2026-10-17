@@ -27,10 +27,14 @@
 - [x] Initial `sync_runs` schema.
 - [x] Sync-run logging around manual CS2Cap refresh requests.
 - [x] Partial refresh failure handling that preserves successful snapshots.
+- [x] Atomic monthly budget reservations and per-item refresh cooldown.
+- [x] Provider timeouts and stop-on-auth/rate-limit behavior.
 - [x] Stale-data UI labels from persisted timestamps.
-- [ ] Scheduled worker sync for watched items.
+- [x] Latest snapshot per item/provider and explicit unknown source freshness.
+- [x] Postgres integration tests and CI migration validation.
+- [x] Opt-in scheduled worker sync for watched items through protected API.
 - [x] Provider comparison view.
-- [ ] Import/export watchlist.
+- [x] Versioned JSON watchlist import/export with atomic merging and validation.
 
 ## v0.3 - Alerts & Portfolio Features
 

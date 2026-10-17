@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
-import type { PriceSnapshot, RefreshWatchlistResponse, Watchlist } from "@csst/shared";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import type { PriceSnapshot, Watchlist } from "@csst/shared";
+import { getRefreshStatusMessage } from "../lib/refresh-status";
+import { getFreshnessLabel, getLatestSnapshotsByProvider } from "../lib/snapshots";
+import { parseWatchlistFile } from "../lib/watchlist-transfer";
 
 import {
   addWatchlistItem,
+  exportWatchlist,
   fetchWatchlist,
+  importWatchlist,
   refreshWatchlist,
   removeWatchlistItem
 } from "../lib/api";
@@ -16,6 +21,7 @@ export function WatchlistDashboard() {
   const [marketHashName, setMarketHashName] = useState("");
   const [status, setStatus] = useState("Loading watchlist...");
   const [isBusy, setIsBusy] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const itemCount = watchlist?.items.length ?? 0;
   const snapshotCount = useMemo(
@@ -79,6 +85,45 @@ export function WatchlistDashboard() {
     }
   }
 
+  async function handleImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (file === undefined) return;
+    setIsBusy(true);
+    setStatus("Importing watchlist...");
+    try {
+      const result = await importWatchlist(await parseWatchlistFile(file));
+      await loadWatchlist(`Imported ${result.added} items; ${result.skipped} duplicates skipped.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to import watchlist.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleExport() {
+    setIsBusy(true);
+    setStatus("Exporting watchlist...");
+    try {
+      const data = await exportWatchlist();
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "cs-skin-tracker-watchlist.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      setStatus(`Exported ${data.items.length} items.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to export watchlist.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   return (
     <main className="page">
       <div className="shell">
@@ -98,6 +143,7 @@ export function WatchlistDashboard() {
 
         <form className="form" onSubmit={(event) => void handleAdd(event)}>
           <input
+            aria-label="Market hash name"
             className="input"
             disabled={isBusy}
             onChange={(event) => setMarketHashName(event.target.value)}
@@ -117,7 +163,37 @@ export function WatchlistDashboard() {
           </button>
         </form>
 
-        <p className="status">{status}</p>
+        <div className="toolbar watchlist-transfer">
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".json,application/json"
+            hidden
+            disabled={isBusy}
+            onChange={(event) => void handleImport(event)}
+            aria-label="Watchlist JSON file"
+          />
+          <button
+            className="button secondary"
+            type="button"
+            disabled={isBusy}
+            onClick={() => fileInput.current?.click()}
+          >
+            Import Watchlist
+          </button>
+          <button
+            className="button secondary"
+            type="button"
+            disabled={isBusy || watchlist === null}
+            onClick={() => void handleExport()}
+          >
+            Export Watchlist
+          </button>
+        </div>
+
+        <p className="status" role="status" aria-live="polite">
+          {status}
+        </p>
 
         <section className="table-wrap watchlist-table" aria-label="Watchlist">
           <table>
@@ -125,7 +201,7 @@ export function WatchlistDashboard() {
               <tr>
                 <th>Skin</th>
                 <th>Latest Providers</th>
-                <th>Best Market</th>
+                <th>Lowest Fresh Ask</th>
                 <th>Freshness</th>
                 <th>Action</th>
               </tr>
@@ -149,8 +225,9 @@ export function WatchlistDashboard() {
                         <div className="snapshot-list">
                           {latestSnapshots.slice(0, 5).map((snapshot) => (
                             <span
-                              className={`snapshot-pill ${snapshot.isStale ? "stale" : "fresh"}`}
+                              className={`snapshot-pill ${snapshot.freshness}`}
                               key={snapshot.id}
+                              title={`${getFreshnessLabel(snapshot)}; source: ${snapshot.sourceUpdatedAt ?? "unknown"}; collected: ${snapshot.collectedAt}`}
                             >
                               {snapshot.provider}:{" "}
                               {snapshot.lowestAsk === null
@@ -163,7 +240,7 @@ export function WatchlistDashboard() {
                     </td>
                     <td>
                       {comparison === null ? (
-                        <span className="muted">No priced providers</span>
+                        <span className="muted">No fresh priced providers</span>
                       ) : (
                         <div className="comparison-cell">
                           <strong>{comparison.cheapest.provider}</strong>
@@ -176,13 +253,14 @@ export function WatchlistDashboard() {
                     </td>
                     <td>
                       <span className={`status-badge ${getStatusClassName(newest)}`}>
-                        {newest === undefined
-                          ? "Not refreshed"
-                          : newest.isStale
-                            ? "Stale"
-                            : "Fresh"}
+                        {newest === undefined ? "Not refreshed" : getFreshnessLabel(newest)}
                       </span>
-                      <div className="muted">{newest?.collectedAt ?? ""}</div>
+                      {newest !== undefined ? (
+                        <>
+                          <div className="muted">Source: {newest.sourceUpdatedAt ?? "unknown"}</div>
+                          <div className="muted">Collected: {newest.collectedAt}</div>
+                        </>
+                      ) : null}
                     </td>
                     <td>
                       <a className="button secondary compact" href={`/items/${entry.item.id}`}>
@@ -220,18 +298,6 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   currency: "USD"
 });
 
-function getLatestSnapshotsByProvider(snapshots: PriceSnapshot[]): PriceSnapshot[] {
-  const latest = new Map<string, PriceSnapshot>();
-  for (const snapshot of snapshots) {
-    const current = latest.get(snapshot.provider);
-    if (current === undefined || compareCollectedAtDesc(snapshot, current) < 0) {
-      latest.set(snapshot.provider, snapshot);
-    }
-  }
-
-  return Array.from(latest.values()).sort(compareCollectedAtDesc);
-}
-
 interface ProviderComparison {
   cheapest: PriceSnapshot & { lowestAsk: number };
   mostExpensive: PriceSnapshot & { lowestAsk: number };
@@ -240,7 +306,8 @@ interface ProviderComparison {
 
 function getProviderComparison(snapshots: PriceSnapshot[]): ProviderComparison | null {
   const pricedSnapshots = snapshots.filter(
-    (snapshot): snapshot is PriceSnapshot & { lowestAsk: number } => snapshot.lowestAsk !== null
+    (snapshot): snapshot is PriceSnapshot & { lowestAsk: number } =>
+      snapshot.lowestAsk !== null && snapshot.freshness === "fresh"
   );
 
   if (pricedSnapshots.length === 0) {
@@ -270,27 +337,5 @@ function getStatusClassName(snapshot: PriceSnapshot | undefined): string {
     return "neutral";
   }
 
-  return snapshot.isStale ? "stale" : "fresh";
-}
-
-function compareCollectedAtDesc(left: PriceSnapshot, right: PriceSnapshot): number {
-  return Date.parse(right.collectedAt) - Date.parse(left.collectedAt);
-}
-
-function getRefreshStatusMessage(result: RefreshWatchlistResponse): string {
-  const budget = result.remainingMonthlyBudget ?? "unknown";
-
-  if (result.failedItems > 0) {
-    const failedNames = result.itemResults
-      .filter((item) => item.status === "failed")
-      .slice(0, 3)
-      .map((item) => item.marketHashName)
-      .join(", ");
-
-    return `Refresh completed with ${result.failedItems} failed item${
-      result.failedItems === 1 ? "" : "s"
-    }. ${result.snapshotsCreated} snapshots created. Failed: ${failedNames}. Remaining monthly budget: ${budget}.`;
-  }
-
-  return `Refresh complete. ${result.snapshotsCreated} snapshots created. Remaining monthly budget: ${budget}.`;
+  return snapshot.freshness;
 }

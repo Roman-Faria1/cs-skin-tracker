@@ -8,6 +8,7 @@ loadDotEnv();
 const apiEnvSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
   WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
+  INTERNAL_SYNC_TOKEN: z.union([z.literal(""), z.string().min(32)]).default(""),
   DATABASE_URL: z
     .string()
     .url()
@@ -15,6 +16,8 @@ const apiEnvSchema = z.object({
   CS2CAP_API_KEY: z.string().min(1).default("replace_me"),
   CS2CAP_BASE_URL: z.string().url().default("https://api.cs2c.app"),
   CS2CAP_MONTHLY_REQUEST_LIMIT: z.coerce.number().int().positive().default(1000),
+  CS2CAP_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  CS2CAP_REFRESH_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(3600),
   CS2CAP_DEFAULT_PROVIDERS: z
     .string()
     .default("steam,csfloat,skinport,csmoney_m,csmoney_t")
@@ -32,10 +35,13 @@ export function loadApiEnv() {
   return {
     port: parsed.API_PORT,
     webOrigin: parsed.WEB_ORIGIN,
+    internalSyncToken: parsed.INTERNAL_SYNC_TOKEN,
     databaseUrl: parsed.DATABASE_URL,
     cs2capApiKey: parsed.CS2CAP_API_KEY,
     cs2capBaseUrl: parsed.CS2CAP_BASE_URL,
     cs2capMonthlyRequestLimit: parsed.CS2CAP_MONTHLY_REQUEST_LIMIT,
+    cs2capRequestTimeoutMs: parsed.CS2CAP_REQUEST_TIMEOUT_MS,
+    cs2capRefreshCooldownSeconds: parsed.CS2CAP_REFRESH_COOLDOWN_SECONDS,
     cs2capDefaultProviders: parsed.CS2CAP_DEFAULT_PROVIDERS
   };
 }
