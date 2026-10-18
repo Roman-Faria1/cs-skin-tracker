@@ -7,6 +7,7 @@ import {
   watchlistTransferSchema,
   WATCHLIST_ITEM_LIMIT
 } from "../src/index.js";
+import { alertRuleInputSchema } from "../src/index.js";
 
 describe("shared schemas", () => {
   it("trims valid market hash names", () => {
@@ -51,5 +52,28 @@ describe("shared schemas", () => {
     expect(() =>
       watchlistTransferSchema.parse({ ...transfer, items: [...transfer.items, "One Too Many"] })
     ).toThrow();
+  });
+});
+
+describe("alert rule validation", () => {
+  const input = {
+    itemId: "00000000-0000-4000-8000-000000000201",
+    kind: "price_below",
+    threshold: 20
+  };
+  it("defaults to all providers for valid price rules", () => {
+    expect(alertRuleInputSchema.parse(input).providerId).toBeNull();
+  });
+  it.each([
+    { threshold: 0 },
+    { threshold: -1 },
+    { threshold: 0.001 },
+    { threshold: Infinity },
+    { kind: "percent_change" },
+    { kind: "provider_spread", providerId: "steam" },
+    { kind: "stale_data", threshold: 0.5 },
+    { kind: "stale_data", threshold: 8761 }
+  ])("rejects invalid thresholds and provider configurations", (change) => {
+    expect(alertRuleInputSchema.safeParse({ ...input, ...change }).success).toBe(false);
   });
 });

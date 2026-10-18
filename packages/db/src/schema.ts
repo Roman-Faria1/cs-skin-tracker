@@ -142,8 +142,38 @@ export const alerts = pgTable("alerts", {
   threshold: numeric("threshold", { precision: 12, scale: 2 }),
   providerId: text("provider_id").references(() => marketProviders.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  triggeredAt: timestamp("triggered_at", { withTimezone: true })
+  triggeredAt: timestamp("triggered_at", { withTimezone: true }),
+  generation: integer("generation").notNull().default(1),
+  armedAt: timestamp("armed_at", { withTimezone: true }).notNull().defaultNow(),
+  baselineSnapshot: jsonb("baseline_snapshot"),
+  lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true }),
+  lastEvaluation: text("last_evaluation")
 });
+
+export const alertEvents = pgTable(
+  "alert_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    alertId: uuid("alert_id").references(() => alerts.id, { onDelete: "set null" }),
+    itemId: uuid("item_id").references(() => items.id, { onDelete: "set null" }),
+    marketHashName: text("market_hash_name").notNull(),
+    kind: alertKindEnum("kind").notNull(),
+    generation: integer("generation").notNull(),
+    threshold: numeric("threshold", { precision: 12, scale: 2 }).notNull(),
+    providerId: text("provider_id"),
+    observedValue: numeric("observed_value", { precision: 24, scale: 6 }).notNull(),
+    message: text("message").notNull(),
+    evidence: jsonb("evidence").notNull(),
+    triggeredAt: timestamp("triggered_at", { withTimezone: true }).notNull()
+  },
+  (table) => ({
+    oncePerGeneration: uniqueIndex("alert_events_generation_idx").on(
+      table.alertId,
+      table.generation
+    ),
+    historyIdx: index("alert_events_history_idx").on(table.triggeredAt.desc(), table.id.desc())
+  })
+);
 
 export const portfolioItems = pgTable("portfolio_items", {
   id: uuid("id").defaultRandom().primaryKey(),

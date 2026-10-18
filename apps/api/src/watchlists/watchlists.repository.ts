@@ -21,7 +21,7 @@ import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { DATABASE } from "../db/db.module.js";
 import { getSnapshotFreshness, parseNullableNumber } from "./watchlists.utils.js";
 
-const DEFAULT_WATCHLIST_ID = "00000000-0000-4000-8000-000000000001";
+export const DEFAULT_WATCHLIST_ID = "00000000-0000-4000-8000-000000000001";
 const DEFAULT_WATCHLIST_NAME = "Default";
 const CS2CAP_PROVIDER_ID = "cs2cap";
 
