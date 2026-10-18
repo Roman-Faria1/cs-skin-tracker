@@ -7,6 +7,9 @@ Reviewed October 17, 2026, through `c924abd`, before starting portfolio work.
 No blocking correctness or regression findings in the reviewed alert changes.
 This is a local code review, not a production security audit or independent approval.
 
+PR #4 subsequently merged into main at `a2d6038`. The user reported that Copilot
+review found no issues. The alerts feature branch has been deleted locally/remotely.
+
 ## Scope
 
 - `apps/api/src/alerts`: rule validation, provider scoping, fresh-quote eligibility,

@@ -3,8 +3,8 @@
 ## Current State
 
 - Repo: `https://github.com/Roman-Faria1/cs-skin-tracker.git`
-- Current branch: `feat/v0-3-portfolio` (stacked on unmerged `feat/v0-3-alerts` at `c924abd`)
-- Latest merged main commit: `c38bc3b` (PR #3, v0.2 reliability). The v0.2 feature branch was merged and deleted.
+- Current branch: `feat/v0-3-portfolio`, rebased onto merged main at `a2d6038`. The unpublished portfolio commit IDs changed; file contents were identical before and after the rebase.
+- Latest merged main commit: `a2d6038` (PR #4, alerts). Local main is synchronized; the alerts branch is deleted locally/remotely and its remote-tracking ref was pruned.
 - Main stack: TypeScript, pnpm workspaces, Next.js, NestJS/Fastify, Drizzle, Postgres, Redis/BullMQ.
 - Data provider: CS2Cap free-tier live prices via `GET https://api.cs2c.app/v1/prices`.
 - v0.1 is effectively complete for personal MVP usage.
@@ -16,8 +16,8 @@
 - Portfolio endpoints: `GET /portfolio?providerId=steam`, `POST /portfolio`, `PUT /portfolio/:id`, `DELETE /portfolio/:id`. POST/PUT body: `{ itemId, quantity, acquisitionPrice: number | null, notes: string | null }`. Acquisition price is per skin, not lot total. Multiple lots for one skin are intentional. Same-item edits still work after unwatching; creating a lot or changing its item requires that item be watched. Removing a lot never changes the watchlist.
 - Read response `summary.grossAskValue` is null if a nonempty book has no fresh priced lots; partial totals are explicitly labeled. `knownCostBasis` includes every known cost; `pricedCostBasis` and `unrealizedPnl` include only matched fresh-price/known-cost lots. Missing costs are not treated as zero. Portfolio monetary totals and unit prices are two-decimal strings; do not convert totals to JS Number. UI uses BigInt-safe formatting.
 - Valuation is a gross listing estimate, not a bid, realized sale, net proceeds, or fee-adjusted valuation. Default all-market comparison includes Steam wallet asks; selecting a market changes the valuation scope without requesting new data. Freshness is evaluated at the response `asOf` timestamp.
-- Local alert review is documented in `docs/reviews/v0-3-alerts.md`; no blocking findings. Alerts is pushed with draft PR #4: `https://github.com/Roman-Faria1/cs-skin-tracker/pull/4`, targeting main and containing only `bf410f8` and `c924abd`. Portfolio remains local/unpushed and stacked on alerts; review/merge alerts first or target a portfolio PR at the alerts branch until it merges.
-- Alert engine/API/UI complete and locally verified; draft PR #4 is awaiting CI/review. Migration `0003_alert_history.sql` adds lifecycle fields and append-only `alert_events` with unique `(alert_id, generation)` and is applied to local app/test DBs.
+- Alerts PR #4 (`https://github.com/Roman-Faria1/cs-skin-tracker/pull/4`) merged into main; Copilot review found no issues, as reported by the user. Local review is documented in `docs/reviews/v0-3-alerts.md`. Portfolio remains local/unpushed; its next PR should target main directly.
+- Alert engine/API/UI complete and merged. Migration `0003_alert_history.sql` adds lifecycle fields and append-only `alert_events` with unique `(alert_id, generation)` and is applied to local app/test DBs.
 - Alert rules are one-shot: `active -> triggered`, then explicit rearm (new generation). Editing also rearms; pause/resume preserves the armed baseline. Global advisory transaction lock serializes rule mutations/evaluation, preventing duplicate events across manual/worker refreshes.
 - Price-below is strict `<` USD; provider spread is `>=` USD across at least two fresh markets. Percent-change is absolute `>=` percent from a positive, fresh, provider-specific quote captured when armed; triggering requires newer collection AND source times. Price rules exclude stale/unknown/future quotes. Stale-data uses oldest source/collection time in scope, or elapsed time since arming if no quote exists; whole-hour thresholds 1-8760.
 - `GET/POST /alerts`, `PUT/PATCH/DELETE /alerts/:id`, `GET /alerts/events?cursor=...`, and `POST /alerts/evaluate`. All evaluation reads cached snapshots only; after refresh (including skipped/failed refreshes) evaluation is best effort and errors are returned separately. History pages use stable timestamp/UUID cursors (50/page) and retain names/configuration/snapshot evidence when rules/items are deleted. Alert cap: 1000 rules.
@@ -51,7 +51,10 @@
 Recent commits:
 
 ```txt
-df8f8c3 feat(portfolio): persist lots and value fresh cached quotes
+50d8c17 docs: record alerts draft pull request
+e911884 feat(web): add portfolio holdings and valuation dashboard
+b3cc9ba feat(portfolio): persist lots and value fresh cached quotes
+a2d6038 Merge pull request #4 from Roman-Faria1/feat/v0-3-alerts
 c924abd feat(web): add alert controls and auditable history
 bf410f8 feat(alerts): persist and evaluate cached market alert rules
 bacd870 feat: add atomic watchlist import and export
@@ -191,7 +194,7 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 
 ## Next Recommended Work
 
-1. Review alerts draft PR #4 against main and address CI/reviewer findings. Portfolio is still local; publish `feat/v0-3-portfolio` against the alerts branch (or main once alerts merges) when requested. Keep stack rebases organized; do not merge portfolio before alerts.
+1. Review and publish `feat/v0-3-portfolio` as a draft PR against main when requested. Alerts PR #4 is already merged with no Copilot findings. Portfolio is rebased and remains local/unpushed; no force push is needed.
 2. Remaining v0.3 product work: dashboard movement summary and biggest movers using saved history. Portfolio holdings/valuation are implemented; independent review and hosted validation remain outstanding.
 3. Keep cached valuation/alert evaluation independent of provider calls and use fixtures. A dedicated stale-check timer and external notifications are future follow-ups; automatic collection remains disabled until deliberately configured.
 4. Before hosted access, complete the v0.4 auth gate and secret/deployment configuration. The default watchlist remains single-user and the ordinary app API is not authenticated.
