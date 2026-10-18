@@ -1,8 +1,33 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from "vitest";
 import { addWatchlistItem, importWatchlist, evaluateAlerts, fetchAlerts, saveAlert } from "./api";
+import { fetchPortfolio, saveHolding } from "./api";
 
 afterEach(() => vi.unstubAllGlobals());
+
+it("validates portfolio responses and preserves holding validation errors", async () => {
+  const fetch = vi.fn().mockResolvedValue(Response.json({ invalid: true }));
+  vi.stubGlobal("fetch", fetch);
+  await expect(fetchPortfolio("steam")).rejects.toThrow();
+  expect(fetch).toHaveBeenCalledWith(
+    "http://localhost:4000/portfolio?providerId=steam",
+    expect.objectContaining({ method: "GET" })
+  );
+  fetch.mockResolvedValue(
+    Response.json(
+      { message: "Add the item to the watchlist before creating a holding" },
+      { status: 400 }
+    )
+  );
+  await expect(
+    saveHolding({
+      itemId: "00000000-0000-4000-8000-000000000201",
+      quantity: 1,
+      acquisitionPrice: null,
+      notes: null
+    })
+  ).rejects.toThrow("watchlist");
+});
 
 it("validates alert responses and propagates provider-baseline errors", async () => {
   const fetch = vi.fn().mockResolvedValue(Response.json({ evaluated: 2, triggered: 1 }));

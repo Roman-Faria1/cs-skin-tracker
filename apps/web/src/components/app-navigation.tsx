@@ -14,6 +14,9 @@ export function AppNavigation() {
       <Link href="/alerts" aria-current={path === "/alerts" ? "page" : undefined}>
         Alerts
       </Link>
+      <Link href="/portfolio" aria-current={path === "/portfolio" ? "page" : undefined}>
+        Portfolio
+      </Link>
     </nav>
   );
 }
