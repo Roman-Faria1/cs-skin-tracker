@@ -22,6 +22,167 @@ const quote: PriceSnapshot = {
   isStale: false
 };
 
+function racePortfolio(quantity: number, providerId: string | null = null): Portfolio {
+  return {
+    asOf: at,
+    providerId,
+    providers: [{ id: "steam", name: "Steam" }],
+    holdings: [
+      {
+        id: lotId,
+        itemId,
+        marketHashName,
+        quantity,
+        acquisitionPrice: 5,
+        notes: null,
+        isWatched: true,
+        createdAt: at,
+        updatedAt: at,
+        valuationStatus: "fresh",
+        quote,
+        unitPrice: "10.00",
+        costBasis: (quantity * 5).toFixed(2),
+        marketValue: (quantity * 10).toFixed(2),
+        unrealizedPnl: (quantity * 5).toFixed(2)
+      }
+    ],
+    summary: {
+      holdingCount: 1,
+      totalQuantity: quantity,
+      valuedHoldings: 1,
+      unvaluedHoldings: 0,
+      unknownCostHoldings: 0,
+      pnlHoldings: 1,
+      valuationStatus: "complete",
+      grossAskValue: (quantity * 10).toFixed(2),
+      knownCostBasis: (quantity * 5).toFixed(2),
+      pricedCostBasis: (quantity * 5).toFixed(2),
+      unrealizedPnl: (quantity * 5).toFixed(2)
+    }
+  };
+}
+
+for (const [lateResult, marketSettled] of [
+  ["success", false],
+  ["failure", false],
+  ["success", true],
+  ["failure", true]
+] as const) {
+  test(`portfolio ignores superseded mount ${lateResult} with newer market load ${marketSettled ? "settled" : "pending"}`, async ({
+    page
+  }) => {
+    let releaseInitial!: () => void;
+    let releaseMarket!: () => void;
+    const initial = new Promise<void>((resolve) => {
+      releaseInitial = resolve;
+    });
+    const market = new Promise<void>((resolve) => {
+      releaseMarket = resolve;
+    });
+    let reads = 0;
+    let watchlistReads = 0;
+    await page.route("**/watchlists/default", async (route) => {
+      const revision = ++watchlistReads;
+      await route.fulfill({
+        json: {
+          id: "00000000-0000-4000-8000-000000000001",
+          name: "Default",
+          items: [
+            {
+              id: "00000000-0000-4000-8000-000000000101",
+              item: {
+                id: itemId,
+                marketHashName: `Watchlist revision ${revision}`,
+                imageUrl: null,
+                createdAt: at
+              },
+              latestSnapshots: []
+            }
+          ]
+        }
+      });
+    });
+    await page.route("http://localhost:4000/portfolio**", async (route) => {
+      const revision = ++reads;
+      if (revision === 1) {
+        await initial;
+        if (lateResult === "failure") {
+          await route.fulfill({ status: 503, json: { message: "Obsolete initial failure" } });
+          return;
+        }
+        await route.fulfill({ json: racePortfolio(1) });
+        return;
+      }
+      if (revision === 3) {
+        await market;
+        await route.fulfill({ json: racePortfolio(4, "steam") });
+        return;
+      }
+      await route.fulfill({ json: racePortfolio(2) });
+    });
+    try {
+      await page.goto("/portfolio");
+      await expect.poll(() => reads).toBe(1);
+      await expect.poll(() => watchlistReads).toBe(1);
+      await page.getByRole("button", { name: "Reload Cache" }).click();
+      const metrics = page.locator(".portfolio-summary");
+      await expect(metrics).toContainText("$20.00");
+      await expect(
+        page
+          .getByLabel("Item", { exact: true })
+          .getByRole("option", { name: "Watchlist revision 2" })
+      ).toHaveCount(1);
+
+      await page.getByLabel("Valuation Market").selectOption("steam");
+      await expect.poll(() => reads).toBe(3);
+      await expect(page.getByRole("button", { name: "Reload Cache" })).toBeDisabled();
+      if (marketSettled) {
+        releaseMarket();
+        await expect(metrics).toContainText("$40.00");
+        await expect(page.getByLabel("Valuation Market")).toHaveValue("steam");
+      }
+      const oldResponse = page.waitForResponse(
+        (response) => response.url() === "http://localhost:4000/portfolio"
+      );
+      releaseInitial();
+      await (await oldResponse).finished();
+      // Let fetch parsing and React commits settle without a wall-clock delay.
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          )
+      );
+      await expect(metrics).toContainText(marketSettled ? "$40.00" : "$20.00");
+      await expect(
+        page
+          .getByLabel("Item", { exact: true })
+          .getByRole("option", { name: `Watchlist revision ${marketSettled ? 3 : 2}` })
+      ).toHaveCount(1);
+      await expect(page.getByRole("status")).not.toContainText("Obsolete initial failure");
+      await expect(page.getByRole("button", { name: "Reload Cache" })).toBeEnabled({
+        enabled: marketSettled
+      });
+      await expect(page.getByLabel("Valuation Market")).toBeEnabled({ enabled: marketSettled });
+
+      releaseMarket();
+      await expect(metrics).toContainText("$40.00");
+      await expect(page.getByLabel("Valuation Market")).toHaveValue("steam");
+      await expect(page.getByLabel("Valuation Market")).toBeEnabled();
+      await expect(page.getByRole("button", { name: "Reload Cache" })).toBeEnabled();
+      await expect(
+        page
+          .getByLabel("Item", { exact: true })
+          .getByRole("option", { name: "Watchlist revision 3" })
+      ).toHaveCount(1);
+      await expect(page.getByRole("status")).not.toContainText("Obsolete initial failure");
+    } finally {
+      releaseInitial();
+      releaseMarket();
+    }
+  });
+}
+
 test("portfolio lots, partial valuation, providers and recoverable failures", async ({
   page
 }, testInfo) => {

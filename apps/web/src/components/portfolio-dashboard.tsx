@@ -37,13 +37,35 @@ export function PortfolioDashboard() {
   const [cost, setCost] = useState("");
   const [notes, setNotes] = useState("");
   const form = useRef<HTMLFormElement>(null);
-  const load = useCallback(async (provider: string | null) => {
-    const [next, watched] = await Promise.all([fetchPortfolio(provider), fetchWatchlist()]);
-    setPortfolio(next);
-    setWatchlist(watched);
-  }, []);
+  const loadVersion = useRef(0);
+  const load = useCallback(
+    async (
+      provider: string | null,
+      success = "",
+      failurePrefix = "Unable to reload cached valuation: "
+    ) => {
+      const version = ++loadVersion.current;
+      setBusy(true);
+      setMessage("");
+      try {
+        const [next, watched] = await Promise.all([fetchPortfolio(provider), fetchWatchlist()]);
+        if (version !== loadVersion.current) return;
+        setPortfolio(next);
+        setWatchlist(watched);
+        setMessage(success);
+      } catch (error) {
+        if (version === loadVersion.current) setMessage(`${failurePrefix}${messageFor(error)}`);
+      } finally {
+        if (version === loadVersion.current) setBusy(false);
+      }
+    },
+    []
+  );
   useEffect(() => {
-    void load(null).catch((error) => setMessage(messageFor(error)));
+    void load(null, "", "");
+    return () => {
+      loadVersion.current += 1;
+    };
   }, [load]);
 
   function reset() {
@@ -53,32 +75,26 @@ export function PortfolioDashboard() {
     setNotes("");
   }
   async function reload(provider = portfolio?.providerId ?? null) {
-    setBusy(true);
-    setMessage("");
-    try {
-      await load(provider);
-    } catch (error) {
-      setMessage(`Unable to reload cached valuation: ${messageFor(error)}`);
-    } finally {
-      setBusy(false);
-    }
+    await load(provider);
   }
   async function mutate(action: () => Promise<unknown>, success: string, clearForm = false) {
+    // A write supersedes any pending read, including the initial mount request.
+    const version = ++loadVersion.current;
     setBusy(true);
     setMessage("");
     try {
       await action();
+      if (version !== loadVersion.current) return;
       if (clearForm) reset();
-      try {
-        await load(portfolio?.providerId ?? null);
-        setMessage(success);
-      } catch (error) {
-        setMessage(`${success} Cached view could not reload: ${messageFor(error)}`);
-      }
+      await load(
+        portfolio?.providerId ?? null,
+        success,
+        `${success} Cached view could not reload: `
+      );
     } catch (error) {
-      setMessage(messageFor(error));
+      if (version === loadVersion.current) setMessage(messageFor(error));
     } finally {
-      setBusy(false);
+      if (version === loadVersion.current) setBusy(false);
     }
   }
   async function submit(event: FormEvent) {
@@ -140,7 +156,11 @@ export function PortfolioDashboard() {
                 ))}
               </select>
             </label>
-            <button className="button secondary" disabled={busy} onClick={() => void reload()}>
+            <button
+              className="button secondary"
+              disabled={busy && portfolio !== null}
+              onClick={() => void reload()}
+            >
               <RotateCcw size={18} aria-hidden="true" />
               Reload Cache
             </button>
