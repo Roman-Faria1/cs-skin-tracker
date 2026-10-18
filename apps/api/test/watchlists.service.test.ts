@@ -1,6 +1,7 @@
 import { Cs2CapClient, Cs2CapError } from "@csst/cs2cap";
 import { describe, expect, it, vi } from "vitest";
 import type { Cs2CapService } from "../src/cs2cap/cs2cap.service.js";
+import type { AlertsService } from "../src/alerts/alerts.service.js";
 import type { WatchlistsRepository } from "../src/watchlists/watchlists.repository.js";
 import { WatchlistsService } from "../src/watchlists/watchlists.service.js";
 
@@ -38,14 +39,33 @@ function setup() {
     getRefreshCooldownSeconds: () => 3600,
     listPrices: vi.fn().mockResolvedValue(response)
   };
+  const alerts = { evaluate: vi.fn().mockResolvedValue({ evaluated: 1, triggered: 0 }) };
   const service = new WatchlistsService(
     provider as unknown as Cs2CapService,
-    repository as unknown as WatchlistsRepository
+    repository as unknown as WatchlistsRepository,
+    alerts as unknown as AlertsService
   );
-  return { service, provider, repository };
+  return { service, provider, repository, alerts };
 }
 
 describe("WatchlistsService refresh safety", () => {
+  it("evaluates cached alerts even without a provider key", async () => {
+    const { service, provider, alerts } = setup();
+    provider.isConfigured.mockReturnValue(false);
+    alerts.evaluate.mockResolvedValue({ evaluated: 1, triggered: 1 });
+    expect((await service.refresh()).alertEvaluation).toEqual({ triggered: 1, error: null });
+    expect(provider.listPrices).not.toHaveBeenCalled();
+    expect(alerts.evaluate).toHaveBeenCalledOnce();
+  });
+
+  it("retains refresh results when alert evaluation fails", async () => {
+    const { service, alerts } = setup();
+    alerts.evaluate.mockRejectedValue(new Error("Database offline"));
+    const result = await service.refresh();
+    expect(result.snapshotsCreated).toBe(2);
+    expect(result.failedItems).toBe(0);
+    expect(result.alertEvaluation?.error).toContain("Alert evaluation failed");
+  });
   it.each([401, 403, 429])(
     "stops remaining items when an HTTP %i body read fails",
     async (status) => {

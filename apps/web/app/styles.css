@@ -31,8 +31,148 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
+}
+
+.app-nav {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 16px 32px;
+  background: var(--surface);
+}
+.app-brand {
+  font-weight: 700;
+  margin-right: auto;
+}
+.app-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 0;
+}
+.app-nav a[aria-current] {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.alerts-shell {
+  min-width: 0;
+}
+.alerts-section {
+  border-top: 1px solid var(--border);
+  padding: 22px 0;
+}
+.alerts-section h2 {
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+.alert-form {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) repeat(3, minmax(130px, 1fr));
+  gap: 14px;
+}
+.alert-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  min-width: 0;
+}
+.alert-form .toolbar {
+  grid-column: 1 / -1;
+}
+.alert-form select {
+  text-overflow: ellipsis;
+}
+.alerts-table {
+  min-width: 900px;
+}
+.alerts-table td:first-child {
+  max-width: 280px;
+  overflow-wrap: anywhere;
+}
+.alerts-table td:nth-child(4) {
+  max-width: 260px;
+  font-size: 13px;
+}
+.icon-button {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  justify-content: center;
+  padding: 0;
+}
+.rule-actions {
+  min-width: 150px;
+  gap: 6px;
+}
+.rule-switch {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 42px;
+  font-size: 13px;
+}
+.rule-switch input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.alert-history {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.alert-history li {
+  border-bottom: 1px solid var(--border);
+  padding: 16px 0;
+  overflow-wrap: anywhere;
+}
+.alert-history p {
+  margin: 8px 0;
+}
+.alert-history .muted,
+.alert-history time {
+  font-size: 13px;
+}
+.history-heading {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.alert-history details {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+.alert-history summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+@media (max-width: 760px) {
+  .app-nav {
+    padding: 12px 20px;
+    gap: 20px;
+  }
+  .app-brand {
+    flex-basis: 100%;
+  }
+  .alert-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 button {

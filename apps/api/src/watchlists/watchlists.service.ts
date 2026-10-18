@@ -4,6 +4,7 @@ import type { RateLimitState } from "@csst/cs2cap";
 import type { RefreshWatchlistResponse, WatchlistItem } from "@csst/shared";
 
 import { Cs2CapService } from "../cs2cap/cs2cap.service.js";
+import { AlertsService } from "../alerts/alerts.service.js";
 import { WatchlistsRepository } from "./watchlists.repository.js";
 import type { SnapshotInput } from "./watchlists.repository.js";
 import { parseNullableDate, parseNullablePrice } from "./watchlists.utils.js";
@@ -14,7 +15,8 @@ export class WatchlistsService {
 
   constructor(
     private readonly cs2cap: Cs2CapService,
-    private readonly repository: WatchlistsRepository
+    private readonly repository: WatchlistsRepository,
+    private readonly alerts: AlertsService
   ) {}
 
   getDefaultWatchlist() {
@@ -151,8 +153,21 @@ export class WatchlistsService {
       });
     }
 
+    let alertEvaluation: RefreshWatchlistResponse["alertEvaluation"];
+    try {
+      const result = await this.alerts.evaluate();
+      alertEvaluation = { triggered: result.triggered, error: null };
+    } catch {
+      this.logger.error("Alert evaluation failed; cached prices retained");
+      alertEvaluation = {
+        triggered: 0,
+        error: "Alert evaluation failed; try checking alerts again"
+      };
+    }
+
     return {
       requestedItems: selectedItems.length,
+      alertEvaluation,
       snapshotsCreated,
       remainingMonthlyBudget: Math.max(
         this.cs2cap.getMonthlyRequestLimit() - (await this.repository.getMonthlyRequestUsage()),

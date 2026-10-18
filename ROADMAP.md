@@ -39,9 +39,9 @@
 ## v0.3 - Alerts & Portfolio Features
 
 - [x] Initial `alerts` and `portfolio_items` schema.
-- [ ] Alert rule evaluation.
+- [x] Cached alert rule evaluation, pause/resume/rearm, and refresh integration.
 - [ ] Portfolio valuation.
-- [ ] In-app alert history.
+- [x] Persisted in-app alert history with immutable evidence and pagination.
 
 ## v0.4 - Hosted Private Beta
 
