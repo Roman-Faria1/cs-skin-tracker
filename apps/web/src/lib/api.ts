@@ -1,4 +1,7 @@
 import {
+  alertEventPageSchema,
+  alertEvaluationResponseSchema,
+  alertRuleSchema,
   importWatchlistResponseSchema,
   itemHistorySchema,
   refreshWatchlistResponseSchema,
@@ -6,6 +9,8 @@ import {
   watchlistTransferSchema
 } from "@csst/shared";
 import type {
+  AlertAction,
+  AlertRuleInput,
   AddWatchlistItemRequest,
   ItemHistory,
   RefreshWatchlistResponse,
@@ -15,6 +20,40 @@ import type { WatchlistTransfer } from "@csst/shared";
 import { z } from "zod";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+
+async function alertRequest(path: string, method = "GET", body?: unknown): Promise<unknown> {
+  const response = await fetch(`${apiBaseUrl}/alerts${path}`, {
+    method,
+    cache: "no-store",
+    ...(body === undefined
+      ? {}
+      : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+  });
+  if (!response.ok)
+    throw new Error(await getApiErrorMessage(response, `Alert request failed: ${response.status}`));
+  return response.json();
+}
+
+export async function fetchAlerts() {
+  return z.array(alertRuleSchema).parse(await alertRequest(""));
+}
+export async function fetchAlertEvents(cursor?: string) {
+  return alertEventPageSchema.parse(
+    await alertRequest(`/events${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`)
+  );
+}
+export async function saveAlert(input: AlertRuleInput, id?: string) {
+  return alertRuleSchema.parse(await alertRequest(id ? `/${id}` : "", id ? "PUT" : "POST", input));
+}
+export async function changeAlertStatus(id: string, action: AlertAction) {
+  return alertRuleSchema.parse(await alertRequest(`/${id}`, "PATCH", { action }));
+}
+export async function deleteAlert(id: string) {
+  await alertRequest(`/${id}`, "DELETE");
+}
+export async function evaluateAlerts() {
+  return alertEvaluationResponseSchema.parse(await alertRequest("/evaluate", "POST"));
+}
 
 export async function fetchWatchlist(): Promise<Watchlist> {
   const response = await fetch(`${apiBaseUrl}/watchlists/default`, {

@@ -22,3 +22,22 @@ it("explains skipped refreshes instead of claiming prices were refreshed", () =>
   expect(message).toContain("cooldown is active");
   expect(message).not.toContain("Refresh complete");
 });
+
+it("reports triggered alerts and degraded alert evaluation", () => {
+  const base = {
+    requestedItems: 0,
+    snapshotsCreated: 0,
+    failedItems: 0,
+    remainingMonthlyBudget: 5,
+    itemResults: []
+  };
+  expect(
+    getRefreshStatusMessage({ ...base, alertEvaluation: { triggered: 2, error: null } })
+  ).toContain("2 alerts triggered");
+  expect(
+    getRefreshStatusMessage({
+      ...base,
+      alertEvaluation: { triggered: 0, error: "Alert evaluation failed" }
+    })
+  ).toContain("Alert evaluation failed");
+});

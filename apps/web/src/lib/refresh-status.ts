@@ -12,7 +12,11 @@ export function getRefreshStatusMessage(result: RefreshWatchlistResponse): strin
     `${result.snapshotsCreated} snapshots saved.`,
     failures.length > 0 ? `${failures.length} failed: ${failedNames}.` : "",
     skipped.length > 0 ? `${skipped.length} skipped. ${notes}.` : "",
-    `Remaining monthly budget: ${result.remainingMonthlyBudget ?? "unknown"}.`
+    `Remaining monthly budget: ${result.remainingMonthlyBudget ?? "unknown"}.`,
+    result.alertEvaluation?.triggered
+      ? `${result.alertEvaluation.triggered} alerts triggered.`
+      : "",
+    result.alertEvaluation?.error ?? ""
   ]
     .filter(Boolean)
     .join(" ");

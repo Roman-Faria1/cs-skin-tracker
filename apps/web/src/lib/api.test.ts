@@ -1,8 +1,31 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from "vitest";
-import { addWatchlistItem, importWatchlist } from "./api";
+import { addWatchlistItem, importWatchlist, evaluateAlerts, fetchAlerts, saveAlert } from "./api";
 
 afterEach(() => vi.unstubAllGlobals());
+
+it("validates alert responses and propagates provider-baseline errors", async () => {
+  const fetch = vi.fn().mockResolvedValue(Response.json({ evaluated: 2, triggered: 1 }));
+  vi.stubGlobal("fetch", fetch);
+  expect(await evaluateAlerts()).toEqual({ evaluated: 2, triggered: 1 });
+  expect(fetch).toHaveBeenCalledWith(
+    "http://localhost:4000/alerts/evaluate",
+    expect.objectContaining({ method: "POST" })
+  );
+  fetch.mockResolvedValue(Response.json({ invalid: true }));
+  await expect(fetchAlerts()).rejects.toThrow();
+  fetch.mockResolvedValue(
+    Response.json({ message: "A fresh baseline is required" }, { status: 400 })
+  );
+  await expect(
+    saveAlert({
+      itemId: "00000000-0000-4000-8000-000000000201",
+      kind: "percent_change",
+      threshold: 5,
+      providerId: "steam"
+    })
+  ).rejects.toThrow("A fresh baseline is required");
+});
 
 it("shows the server's capacity error when a merge or individual add is rejected", async () => {
   const message = "Watchlist can contain at most 1000 items; no items were added";
