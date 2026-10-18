@@ -3,13 +3,20 @@
 ## Current State
 
 - Repo: `https://github.com/Roman-Faria1/cs-skin-tracker.git`
-- Current branch: `feat/v0-3-alerts`
+- Current branch: `feat/v0-3-portfolio` (stacked on unmerged `feat/v0-3-alerts` at `c924abd`)
 - Latest merged main commit: `c38bc3b` (PR #3, v0.2 reliability). The v0.2 feature branch was merged and deleted.
 - Main stack: TypeScript, pnpm workspaces, Next.js, NestJS/Fastify, Drizzle, Postgres, Redis/BullMQ.
 - Data provider: CS2Cap free-tier live prices via `GET https://api.cs2c.app/v1/prices`.
 - v0.1 is effectively complete for personal MVP usage.
 - v0.2 reliability, integration/CI coverage, opt-in scheduled collection, and watchlist transfer are merged.
-- Current slice: v0.3 cached alert rules and persisted in-app history. Portfolio valuation follows in a separate slice.
+- Current slice: v0.3 portfolio lots and cached valuation. Alerts reviewed locally: no blocking correctness findings; single-user auth, timer/notifications, and real-provider end-to-end coverage remain known limitations.
+- Portfolio implemented: reuse existing `portfolio_items` table; integer quantities, optional per-unit acquisition price, notes, CRUD, and fresh cached lowest-ask valuation with optional market filter. No additional provider calls. Money totals use BigInt cents and decimal-string API fields. Stale/unknown/missing/future quotes are unvalued, never zero; summary P&L covers only holdings with both fresh prices and known costs.
+- Portfolio backend implemented and initial tests pass: independent lots per skin, 1000-lot cap protected by advisory lock, quantities 1-1,000,000, optional acquisition cost (zero remains known), notes up to 2000 characters. Reads use a repeatable-read, read-only transaction and deterministic latest snapshot per item/provider. No migration needed: the existing portfolio table already supports these fields.
+- Portfolio UI at `/portfolio`: lot CRUD, fresh quote evidence, market filter, partial coverage and matched-cost P&L, and re-watch action for retained unwatched holdings. Cached reload never refreshes a provider. Successful writes remain acknowledged if a subsequent reload fails. All six desktop/mobile browser tests pass.
+- Portfolio endpoints: `GET /portfolio?providerId=steam`, `POST /portfolio`, `PUT /portfolio/:id`, `DELETE /portfolio/:id`. POST/PUT body: `{ itemId, quantity, acquisitionPrice: number | null, notes: string | null }`. Acquisition price is per skin, not lot total. Multiple lots for one skin are intentional. Same-item edits still work after unwatching; creating a lot or changing its item requires that item be watched. Removing a lot never changes the watchlist.
+- Read response `summary.grossAskValue` is null if a nonempty book has no fresh priced lots; partial totals are explicitly labeled. `knownCostBasis` includes every known cost; `pricedCostBasis` and `unrealizedPnl` include only matched fresh-price/known-cost lots. Missing costs are not treated as zero. Portfolio monetary totals and unit prices are two-decimal strings; do not convert totals to JS Number. UI uses BigInt-safe formatting.
+- Valuation is a gross listing estimate, not a bid, realized sale, net proceeds, or fee-adjusted valuation. Default all-market comparison includes Steam wallet asks; selecting a market changes the valuation scope without requesting new data. Freshness is evaluated at the response `asOf` timestamp.
+- Local alert review is documented in `docs/reviews/v0-3-alerts.md`; no blocking findings. Neither feature branch has been pushed/opened as a PR yet. Portfolio is stacked on alerts, so review/merge alerts first or target a portfolio PR at the alerts branch until it merges.
 - Alert engine/API/UI complete and locally verified on this branch; not yet pushed or opened as a PR. Migration `0003_alert_history.sql` adds lifecycle fields and append-only `alert_events` with unique `(alert_id, generation)` and is applied to local app/test DBs.
 - Alert rules are one-shot: `active -> triggered`, then explicit rearm (new generation). Editing also rearms; pause/resume preserves the armed baseline. Global advisory transaction lock serializes rule mutations/evaluation, preventing duplicate events across manual/worker refreshes.
 - Price-below is strict `<` USD; provider spread is `>=` USD across at least two fresh markets. Percent-change is absolute `>=` percent from a positive, fresh, provider-specific quote captured when armed; triggering requires newer collection AND source times. Price rules exclude stale/unknown/future quotes. Stale-data uses oldest source/collection time in scope, or elapsed time since arming if no quote exists; whole-hour thresholds 1-8760.
@@ -44,6 +51,8 @@
 Recent commits:
 
 ```txt
+df8f8c3 feat(portfolio): persist lots and value fresh cached quotes
+c924abd feat(web): add alert controls and auditable history
 bf410f8 feat(alerts): persist and evaluate cached market alert rules
 bacd870 feat: add atomic watchlist import and export
 dd8e4c2 feat: add opt-in scheduled watchlist collection
@@ -160,6 +169,8 @@ server before building/testing the production web output, since both use `.next`
 
 Validated recently:
 
+- Portfolio slice, October 17, 2026: 143 unit/API/integration tests passed, including 23 Postgres tests and one real Redis scheduler test. Six Chromium tests passed (watchlist, alerts, portfolio on desktop/mobile). Typecheck, lint, formatting and production build pass. Portfolio tests cover exact/large totals, unknown and zero costs, stale/missing/future source data, provider filters, matched-cost P&L, CRUD persistence, concurrent capacity protection, unwatched retention, API errors, and write-success/read-failure recovery. No provider quota used.
+- Final app/API smoke passed: `GET http://localhost:4000/portfolio` returns five cached market choices and a valid empty portfolio; `http://localhost:3000/portfolio` returns HTTP 200. Production web/API are running locally on 3000/4000; no worker started and no real holdings were inserted during verification.
 - v0.3 alert slice, October 17, 2026: 109 unit/API/integration tests passed, including 17 Postgres tests and one real Redis scheduler test. Four Chromium browser tests passed (watchlist + alert lifecycle on desktop/mobile). Typecheck, lint, format, production build, and live cached alert/history API smoke checks passed. Screenshots inspected; no real CS2Cap requests made.
 - Local app includes `/alerts` at `http://localhost:3000/alerts`; latest build served by web/API processes on 3000/4000. Test screenshots are ignored under `test-results/`.
 - Typecheck passed.
@@ -180,9 +191,9 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 
 ## Next Recommended Work
 
-1. Review `feat/v0-3-alerts`, push/open its PR, and address review feedback before merging. Do not declare the full v0.3 milestone complete yet.
-2. Next separate branch: portfolio holdings (quantity, acquisition cost, notes), valuation from fresh cached prices, and stale/missing valuation labels. No additional CS2Cap calls.
-3. Keep alert evaluation independent of provider calls and use fixtures. A dedicated stale-check timer and external notifications are future follow-ups; automatic collection remains disabled until deliberately configured.
+1. Publish/review `feat/v0-3-alerts` against main, then `feat/v0-3-portfolio` against the alerts branch (or main once alerts merges). Keep review feedback and any stack rebases organized; do not merge portfolio before alerts.
+2. Remaining v0.3 product work: dashboard movement summary and biggest movers using saved history. Portfolio holdings/valuation are implemented; independent review and hosted validation remain outstanding.
+3. Keep cached valuation/alert evaluation independent of provider calls and use fixtures. A dedicated stale-check timer and external notifications are future follow-ups; automatic collection remains disabled until deliberately configured.
 4. Before hosted access, complete the v0.4 auth gate and secret/deployment configuration. The default watchlist remains single-user and the ordinary app API is not authenticated.
 
 ## Gotchas

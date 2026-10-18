@@ -36,6 +36,136 @@ select {
   font: inherit;
 }
 
+textarea {
+  font: inherit;
+  resize: vertical;
+}
+.portfolio-shell {
+  min-width: 0;
+}
+.portfolio-provider {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  max-width: 260px;
+}
+.portfolio-provider select {
+  min-width: 0;
+}
+.valuation-disclaimer {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 24px;
+}
+.portfolio-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  padding: 20px 0;
+  margin: 0 0 20px;
+  border-top: 1px solid var(--border);
+}
+.portfolio-summary > div {
+  min-width: 0;
+}
+.portfolio-summary dt {
+  font-size: 12px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+}
+.portfolio-summary dd {
+  margin: 8px 0;
+  font-size: 22px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.portfolio-summary span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.holding-form {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) minmax(120px, 1fr) minmax(170px, 1fr);
+  gap: 14px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.form-field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  min-width: 0;
+}
+.holding-notes,
+.holding-commands {
+  grid-column: 1 / -1;
+}
+.holding-notes textarea {
+  min-height: 64px;
+}
+.holdings-table {
+  min-width: 1150px;
+}
+.holdings-table td {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.holdings-table td:first-child {
+  min-width: 240px;
+  max-width: 280px;
+  overflow-wrap: anywhere;
+}
+.holdings-table td:nth-child(n + 5):nth-child(-n + 7) {
+  min-width: 145px;
+  max-width: 190px;
+  overflow-wrap: anywhere;
+}
+.holding-note {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: pre-wrap;
+  margin: 8px 0 0;
+}
+.holding-actions {
+  min-width: 90px;
+  gap: 6px;
+}
+.unwatched-label {
+  color: #8a4b0f;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.quote-evidence {
+  margin-top: 6px;
+  font-size: 12px;
+  max-width: 160px;
+  overflow-wrap: anywhere;
+}
+.quote-evidence summary {
+  color: var(--accent);
+  cursor: pointer;
+}
+.pnl-negative {
+  color: var(--danger);
+}
+@media (max-width: 760px) {
+  .portfolio-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 16px;
+  }
+  .portfolio-summary dd {
+    font-size: 20px;
+  }
+  .holding-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .portfolio-provider {
+    max-width: 100%;
+  }
+}
+
 .app-nav {
   align-items: center;
   border-bottom: 1px solid var(--border);

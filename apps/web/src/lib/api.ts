@@ -2,6 +2,8 @@ import {
   alertEventPageSchema,
   alertEvaluationResponseSchema,
   alertRuleSchema,
+  holdingSchema,
+  portfolioSchema,
   importWatchlistResponseSchema,
   itemHistorySchema,
   refreshWatchlistResponseSchema,
@@ -16,10 +18,45 @@ import type {
   RefreshWatchlistResponse,
   Watchlist
 } from "@csst/shared";
+import type { HoldingInput } from "@csst/shared";
 import type { WatchlistTransfer } from "@csst/shared";
 import { z } from "zod";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+
+async function portfolioRequest(
+  path: string,
+  method = "GET",
+  body?: HoldingInput
+): Promise<unknown> {
+  const response = await fetch(`${apiBaseUrl}/portfolio${path}`, {
+    method,
+    cache: "no-store",
+    ...(body === undefined
+      ? {}
+      : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+  });
+  if (!response.ok)
+    throw new Error(
+      await getApiErrorMessage(response, `Portfolio request failed: ${response.status}`)
+    );
+  return response.json();
+}
+export async function fetchPortfolio(providerId: string | null = null) {
+  return portfolioSchema.parse(
+    await portfolioRequest(
+      providerId === null ? "" : `?providerId=${encodeURIComponent(providerId)}`
+    )
+  );
+}
+export async function saveHolding(input: HoldingInput, id?: string) {
+  return holdingSchema.parse(
+    await portfolioRequest(id ? `/${id}` : "", id ? "PUT" : "POST", input)
+  );
+}
+export async function deleteHolding(id: string) {
+  await portfolioRequest(`/${id}`, "DELETE");
+}
 
 async function alertRequest(path: string, method = "GET", body?: unknown): Promise<unknown> {
   const response = await fetch(`${apiBaseUrl}/alerts${path}`, {

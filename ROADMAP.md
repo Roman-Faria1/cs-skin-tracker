@@ -40,8 +40,10 @@
 
 - [x] Initial `alerts` and `portfolio_items` schema.
 - [x] Cached alert rule evaluation, pause/resume/rearm, and refresh integration.
-- [ ] Portfolio valuation.
+- [x] Portfolio holding lots: quantity, optional per-skin acquisition cost, notes, CRUD.
+- [x] Cached portfolio valuation with provider selection, coverage labels, and matched-cost P&L.
 - [x] Persisted in-app alert history with immutable evidence and pagination.
+- [ ] Dashboard movement summary and biggest movers.
 
 ## v0.4 - Hosted Private Beta
 
