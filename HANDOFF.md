@@ -3,7 +3,7 @@
 ## Current State
 
 - Repo: `https://github.com/Roman-Faria1/cs-skin-tracker.git`
-- Current branch: `feat/v0-3-market-overview`, based on merged main plus local handoff commit `869dd70`. Dashboard summary implemented and locally verified; ready for GitHub review. No PR has been opened for this branch yet.
+- Current branch: `feat/v0-3-market-overview`, published with draft PR #6 against main: `https://github.com/Roman-Faria1/cs-skin-tracker/pull/6`. Dashboard summary implemented and locally verified; awaiting CI/review. The prior local merge-handoff commit `869dd70` is included.
 - Latest merged main commit: `82f8630` (PR #5, portfolio). Local main is synchronized with origin/main. Portfolio and alerts feature branches are deleted locally/remotely; stale remote-tracking refs were pruned.
 - Main stack: TypeScript, pnpm workspaces, Next.js, NestJS/Fastify, Drizzle, Postgres, Redis/BullMQ.
 - Data provider: CS2Cap free-tier live prices via `GET https://api.cs2c.app/v1/prices`.
@@ -205,7 +205,7 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 
 ## Next Recommended Work
 
-1. Review `feat/v0-3-market-overview` and open a draft PR against main when requested. The merge-handoff commit is included. No new migration is needed. Expect unavailable movement until enough fresh, same-provider historical snapshots exist; do not spend provider quota solely to fill the overview.
+1. Review market-overview draft PR #6 against main and address CI/reviewer findings before marking it ready or merging. No new migration is needed. Expect unavailable movement until enough fresh, same-provider historical snapshots exist; do not spend provider quota solely to fill the overview.
 2. After review/merge, confirm v0.3 release gates and decide release tagging/versioning. Then begin v0.4 private hosting preparations: auth gate first, deployment secrets/configuration, backups/migrations, and smoke checks. Hosted validation remains outstanding; do not expose the current unauthenticated API publicly.
 3. Keep cached valuation/alert evaluation independent of provider calls and use fixtures. A dedicated stale-check timer and external notifications are future follow-ups; automatic collection remains disabled until deliberately configured.
 4. Before hosted access, complete the v0.4 auth gate and secret/deployment configuration. The default watchlist remains single-user and the ordinary app API is not authenticated.
