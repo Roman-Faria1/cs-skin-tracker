@@ -1,4 +1,5 @@
 import type { MovementItem, PriceSnapshot } from "@csst/shared";
+import { movementItemSchema } from "@csst/shared";
 import { describe, expect, it } from "vitest";
 import { compareItem, summarizeMovement } from "../src/dashboard/movement.js";
 
@@ -35,6 +36,42 @@ function compare(
 }
 
 describe("cached movement comparisons", () => {
+  it.each([-1, NaN, Infinity, -Infinity])(
+    "retains invalid price classifications while normalizing %s evidence",
+    (lowestAsk) => {
+      const invalidCurrent = { ...current, lowestAsk };
+      const invalidBaseline = { ...baseline, lowestAsk };
+      const currentResult = compare([invalidCurrent]);
+      const baselineResult = compare([current], [invalidBaseline]);
+      expect(currentResult).toMatchObject({
+        status: "invalid_current",
+        current: { lowestAsk: null, sourceUpdatedAt: current.sourceUpdatedAt },
+        changePercent: null
+      });
+      expect(baselineResult).toMatchObject({
+        status: "invalid_baseline",
+        baseline: { lowestAsk: null, sourceUpdatedAt: baseline.sourceUpdatedAt },
+        changePercent: null
+      });
+      expect(movementItemSchema.safeParse(currentResult).success).toBe(true);
+      expect(movementItemSchema.safeParse(baselineResult).success).toBe(true);
+      expect(invalidCurrent.lowestAsk).toBe(lowestAsk);
+      expect(invalidBaseline.lowestAsk).toBe(lowestAsk);
+    }
+  );
+  it("normalizes invalid ancillary evidence without excluding valid ask comparisons", () => {
+    const result = compare(
+      [{ ...current, highestBid: -1, askVolume: -2, bidVolume: 1.5 }],
+      [{ ...baseline, highestBid: NaN, askVolume: Infinity }]
+    );
+    expect(result).toMatchObject({
+      status: "comparable",
+      changePercent: 10,
+      current: { lowestAsk: 11, highestBid: null, askVolume: null, bidVolume: null },
+      baseline: { lowestAsk: 10, highestBid: null, askVolume: null }
+    });
+    expect(movementItemSchema.safeParse(result).success).toBe(true);
+  });
   it("calculates exact cent changes and classifies zero/down/up", () => {
     expect(compare()).toMatchObject({
       status: "comparable",

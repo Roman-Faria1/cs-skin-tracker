@@ -20,6 +20,22 @@ function quality(quote: PriceSnapshot, reference: Date): "fresh" | "stale" | "un
   );
 }
 
+function evidence(quote: PriceSnapshot | null): PriceSnapshot | null {
+  if (quote === null) return null;
+  const nonnegative = (value: number | null) =>
+    value !== null && Number.isFinite(value) && value >= 0 ? value : null;
+  const volume = (value: number | null) =>
+    value !== null && Number.isInteger(value) && value >= 0 ? value : null;
+  // Classify raw quotes first; invalid cached numbers must not break the response contract.
+  return {
+    ...quote,
+    lowestAsk: nonnegative(quote.lowestAsk),
+    highestBid: nonnegative(quote.highestBid),
+    askVolume: volume(quote.askVolume),
+    bidVolume: volume(quote.bidVolume)
+  };
+}
+
 export function compareItem(
   item: { itemId: string; marketHashName: string },
   latest: PriceSnapshot[],
@@ -52,8 +68,8 @@ export function compareItem(
     ...item,
     status,
     providerId: current?.provider ?? providerId,
-    current,
-    baseline,
+    current: evidence(current),
+    baseline: evidence(baseline),
     changeUsd: null,
     changePercent: null,
     direction: null
@@ -72,8 +88,8 @@ export function compareItem(
     ...item,
     status: "comparable",
     providerId: current.provider,
-    current,
-    baseline,
+    current: evidence(current)!,
+    baseline: evidence(baseline)!,
     changeUsd: signedMoney(delta),
     changePercent: (Number(delta) / Number(cents(baseline.lowestAsk))) * 100,
     direction: delta > 0n ? "up" : delta < 0n ? "down" : "flat"

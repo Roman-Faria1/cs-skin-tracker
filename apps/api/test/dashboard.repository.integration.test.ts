@@ -71,6 +71,35 @@ describe.skipIf(!url)("DashboardRepository with Postgres", () => {
     expect(result.comparisonAt).toBe("2026-10-17T12:00:00.000Z");
     expect(await watchlists.getMonthlyRequestUsage()).toBe(0);
   });
+  it("returns invalid negative asks as unavailable without losing healthy items", async () => {
+    const badCurrent = await watchlists.addItem("Negative Current Skin");
+    const badBaseline = await watchlists.addItem("Negative Baseline Skin");
+    const healthy = await watchlists.addItem("Healthy Skin");
+    for (const [entry, currentPrice, baselinePrice] of [
+      [badCurrent, -1, 10],
+      [badBaseline, 11, -2],
+      [healthy, 11, 10]
+    ] as const) {
+      await quote(entry.item.id, "steam", baselinePrice, -24);
+      await quote(entry.item.id, "steam", currentPrice, 0);
+    }
+    const result = await report();
+    expect(result.items.find((item) => item.itemId === badCurrent.item.id)).toMatchObject({
+      status: "invalid_current",
+      current: { lowestAsk: null }
+    });
+    expect(result.items.find((item) => item.itemId === badBaseline.item.id)).toMatchObject({
+      status: "invalid_baseline",
+      baseline: { lowestAsk: null }
+    });
+    expect(result.items.find((item) => item.itemId === healthy.item.id)).toMatchObject({
+      status: "comparable",
+      changePercent: 10
+    });
+    expect(result.summary).toMatchObject({ watchedItems: 3, comparableItems: 1, excludedItems: 2 });
+    expect(result.gainers).toHaveLength(1);
+    expect(await watchlists.getMonthlyRequestUsage()).toBe(0);
+  });
   it("uses the cheapest fresh current provider's own history, not another market", async () => {
     const entry = await watchlists.addItem("Provider Skin");
     await quote(entry.item.id, "steam", 5, -24);

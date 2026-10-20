@@ -25,33 +25,46 @@ export function MarketOverview({ revision }: { revision: number }) {
   const [attempt, setAttempt] = useState(0);
   const [report, setReport] = useState<MovementReport | null>(null);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [movementLoading, setMovementLoading] = useState(true);
+  const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [movementError, setMovementError] = useState("");
   const [portfolioError, setPortfolioError] = useState("");
   const requestVersion = useRef(0);
   useEffect(() => {
     const version = ++requestVersion.current;
-    setLoading(true);
+    setMovementLoading(true);
+    setPortfolioLoading(true);
     setReport(null);
     setPortfolio(null);
     setMovementError("");
     setPortfolioError("");
-    void Promise.allSettled([fetchMovement(window, providerId), fetchPortfolio()]).then(
-      ([movement, value]) => {
+    void fetchMovement(window, providerId)
+      .then((movement) => {
         if (version !== requestVersion.current) return;
-        if (movement.status === "fulfilled") {
-          setReport(movement.value);
-          setProviders(movement.value.providers);
-        } else setMovementError(errorMessage(movement.reason));
-        if (value.status === "fulfilled") setPortfolio(value.value);
-        else setPortfolioError(errorMessage(value.reason));
-        setLoading(false);
-      }
-    );
+        setReport(movement);
+        setProviders(movement.providers);
+      })
+      .catch((error: unknown) => {
+        if (version === requestVersion.current) setMovementError(errorMessage(error));
+      })
+      .finally(() => {
+        if (version === requestVersion.current) setMovementLoading(false);
+      });
+    void fetchPortfolio()
+      .then((value) => {
+        if (version === requestVersion.current) setPortfolio(value);
+      })
+      .catch((error: unknown) => {
+        if (version === requestVersion.current) setPortfolioError(errorMessage(error));
+      })
+      .finally(() => {
+        if (version === requestVersion.current) setPortfolioLoading(false);
+      });
     return () => {
       requestVersion.current += 1;
     };
   }, [window, providerId, revision, attempt]);
+  const loading = movementLoading || portfolioLoading;
   const summary = report?.summary;
   return (
     <section className="market-overview" aria-labelledby="overview-heading" aria-busy={loading}>
@@ -116,7 +129,7 @@ export function MarketOverview({ revision }: { revision: number }) {
           <span>
             {summary
               ? `${summary.excludedItems} unavailable`
-              : loading
+              : movementLoading
                 ? "Loading..."
                 : "Unavailable"}
           </span>
@@ -139,7 +152,7 @@ export function MarketOverview({ revision }: { revision: number }) {
           <span>
             {portfolio
               ? `All markets | ${portfolio.summary.valuationStatus}`
-              : loading
+              : portfolioLoading
                 ? "Loading..."
                 : "Unavailable"}
           </span>
@@ -149,7 +162,7 @@ export function MarketOverview({ revision }: { revision: number }) {
       <p className="overview-meta" aria-live="polite">
         {report
           ? `As of ${date(report.asOf)} | Baseline at/before ${date(report.comparisonAt)}, up to ${report.maxBaselineAgeHours}h earlier | Same-market asks`
-          : loading
+          : movementLoading
             ? "Loading saved price comparisons..."
             : "Movement unavailable"}
       </p>
@@ -163,14 +176,14 @@ export function MarketOverview({ revision }: { revision: number }) {
         <Movers
           title="Biggest Risers"
           rows={report?.gainers ?? []}
-          pending={loading}
+          pending={movementLoading}
           available={report !== null}
           up
         />
         <Movers
           title="Biggest Fallers"
           rows={report?.decliners ?? []}
-          pending={loading}
+          pending={movementLoading}
           available={report !== null}
           up={false}
         />

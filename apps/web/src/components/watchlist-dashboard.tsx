@@ -32,9 +32,9 @@ export function WatchlistDashboard() {
   );
 
   async function loadWatchlist(nextStatus = "") {
+    setOverviewRevision((value) => value + 1);
     const nextWatchlist = await fetchWatchlist();
     setWatchlist(nextWatchlist);
-    setOverviewRevision((value) => value + 1);
     setStatus(nextStatus);
   }
 
