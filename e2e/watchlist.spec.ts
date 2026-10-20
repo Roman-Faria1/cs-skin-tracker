@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import { emptyPortfolio, movementFixture } from "./fixtures/market-overview";
 
 const itemId = "00000000-0000-4000-8000-000000000201";
 const marketHashName = "AK-47 | Redline (Field-Tested)";
@@ -34,6 +35,32 @@ test("watchlist transfer, skipped refreshes, and source freshness", async ({ pag
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   let imports = 0;
+  await page.route("http://localhost:4000/portfolio**", (route) =>
+    route.fulfill({ json: emptyPortfolio })
+  );
+  await page.route("http://localhost:4000/dashboard/movement**", (route) =>
+    route.fulfill({
+      json: {
+        ...movementFixture(),
+        items: [
+          {
+            itemId,
+            marketHashName,
+            status: "stale_current",
+            providerId: "steam",
+            current: snapshot,
+            baseline: null,
+            changeUsd: null,
+            changePercent: null,
+            direction: null
+          }
+        ],
+        gainers: [],
+        decliners: [],
+        summary: { watchedItems: 1, comparableItems: 0, excludedItems: 1, up: 0, down: 0, flat: 0 }
+      }
+    })
+  );
   await page.route("**/watchlists/default**", async (route) => {
     if (route.request().method() === "OPTIONS") {
       await route.fulfill({
@@ -98,7 +125,11 @@ test("watchlist transfer, skipped refreshes, and source freshness", async ({ pag
     }
   });
   await page.goto("/");
-  await expect(page.getByText(marketHashName, { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "Watchlist", exact: true })
+      .getByText(marketHashName, { exact: true })
+  ).toBeVisible();
   await expect(page.getByText("Stale", { exact: true })).toBeVisible();
   await expect(page.getByText("steam: $14.50", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
