@@ -2,8 +2,21 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { addWatchlistItem, importWatchlist, evaluateAlerts, fetchAlerts, saveAlert } from "./api";
 import { fetchPortfolio, saveHolding } from "./api";
+import { fetchMovement } from "./api";
 
 afterEach(() => vi.unstubAllGlobals());
+
+it("validates movement responses and sends cache-only window/market queries", async () => {
+  const fetch = vi.fn().mockResolvedValue(Response.json({ invalid: true }));
+  vi.stubGlobal("fetch", fetch);
+  await expect(fetchMovement("7d", "steam")).rejects.toThrow();
+  expect(fetch).toHaveBeenCalledWith(
+    "http://localhost:4000/dashboard/movement?window=7d&providerId=steam",
+    { cache: "no-store" }
+  );
+  fetch.mockResolvedValue(Response.json({ message: "Unknown market provider" }, { status: 400 }));
+  await expect(fetchMovement("24h", "bad")).rejects.toThrow("Unknown market provider");
+});
 
 it("validates portfolio responses and preserves holding validation errors", async () => {
   const fetch = vi.fn().mockResolvedValue(Response.json({ invalid: true }));

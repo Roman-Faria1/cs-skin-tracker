@@ -4,6 +4,7 @@ import {
   alertRuleSchema,
   holdingSchema,
   portfolioSchema,
+  movementReportSchema,
   importWatchlistResponseSchema,
   itemHistorySchema,
   refreshWatchlistResponseSchema,
@@ -19,10 +20,22 @@ import type {
   Watchlist
 } from "@csst/shared";
 import type { HoldingInput } from "@csst/shared";
+import type { MovementWindow } from "@csst/shared";
 import type { WatchlistTransfer } from "@csst/shared";
 import { z } from "zod";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+
+export async function fetchMovement(window: MovementWindow, providerId: string | null = null) {
+  const query = new URLSearchParams({ window });
+  if (providerId !== null) query.set("providerId", providerId);
+  const response = await fetch(`${apiBaseUrl}/dashboard/movement?${query}`, { cache: "no-store" });
+  if (!response.ok)
+    throw new Error(
+      await getApiErrorMessage(response, `Unable to load movement: ${response.status}`)
+    );
+  return movementReportSchema.parse(await response.json());
+}
 
 async function portfolioRequest(
   path: string,

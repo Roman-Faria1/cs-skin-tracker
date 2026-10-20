@@ -3,13 +3,17 @@
 ## Current State
 
 - Repo: `https://github.com/Roman-Faria1/cs-skin-tracker.git`
-- Current branch: `docs/portfolio-merge-handoff`, a local documentation-only follow-up to the merged portfolio work. No next product phase has started.
+- Current branch: `feat/v0-3-market-overview`, based on merged main plus local handoff commit `869dd70`. Dashboard summary implemented and locally verified. Nothing from this branch is pushed yet.
 - Latest merged main commit: `82f8630` (PR #5, portfolio). Local main is synchronized with origin/main. Portfolio and alerts feature branches are deleted locally/remotely; stale remote-tracking refs were pruned.
 - Main stack: TypeScript, pnpm workspaces, Next.js, NestJS/Fastify, Drizzle, Postgres, Redis/BullMQ.
 - Data provider: CS2Cap free-tier live prices via `GET https://api.cs2c.app/v1/prices`.
 - v0.1 is effectively complete for personal MVP usage.
 - v0.2 reliability, integration/CI coverage, opt-in scheduled collection, and watchlist transfer are merged.
-- v0.3 alerts, portfolio lots, and cached valuation are merged. Dashboard movement summary/biggest movers remain before closing the milestone. Single-user auth, timer/notifications, and real-provider end-to-end coverage remain known limitations.
+- v0.3 alerts, portfolio lots, and cached valuation are merged. Dashboard movement summary/biggest movers are implemented on this branch; review/merge remain before closing the milestone. Single-user auth, timer/notifications, and real-provider end-to-end coverage remain known limitations.
+- Market overview scope: cache-only 24h (default) / 7d comparison, optional market filter, top five gainers/decliners, comparison coverage/evidence, and cached portfolio summary. Select each item's lowest fresh current ask, then compare only the SAME provider against its latest collected snapshot at/before the cutoff (up to 24h earlier). No cross-market price jumps, stale/unknown/future evidence, zero baselines, or non-advancing source dates in rankings. Missing evidence is unavailable, not flat. This is an approximate cutoff comparison; actual source/collection dates remain visible.
+- Movement API: `GET /dashboard/movement?window=24h&providerId=steam`; defaults to 24h/all markets. Strict query validation; unknown providers return 400. Queries use the existing snapshot index in a read-only repeatable-read transaction; no migration needed. Latest null-price/unknown-source rows are not replaced with older usable rows. No saved baseline in range means insufficient history; no interpolation or forward-looking baseline. Comparison source times must advance.
+- Ranking uses exact integer-cent ratios, with deterministic name/UUID tie-breaks, before display rounding. Flat is based on unchanged cents, not rounded percent. Small nonzero percentages display as `<0.01%` with direction preserved. API dollar deltas are decimal strings; source unit asks remain numbers consistent with existing snapshots.
+- Watchlist first screen now includes Market Overview: segmented 24h/7d window, market filter, cache-only reload, risers/fallers, comparison coverage details and timestamps, and gross all-market portfolio value. Portfolio valuation is independent of the movement filter and has its own as-of label. Either cached endpoint can fail without hiding the other's results. Request generations discard superseded successes/errors on filter changes or watchlist reloads. No new scheduled collection or real provider requests.
 - Portfolio implemented: reuse existing `portfolio_items` table; integer quantities, optional per-unit acquisition price, notes, CRUD, and fresh cached lowest-ask valuation with optional market filter. No additional provider calls. Money totals use BigInt cents and decimal-string API fields. Stale/unknown/missing/future quotes are unvalued, never zero; summary P&L covers only holdings with both fresh prices and known costs.
 - Portfolio backend implemented and initial tests pass: independent lots per skin, 1000-lot cap protected by advisory lock, quantities 1-1,000,000, optional acquisition cost (zero remains known), notes up to 2000 characters. Reads use a repeatable-read, read-only transaction and deterministic latest snapshot per item/provider. No migration needed: the existing portfolio table already supports these fields.
 - Portfolio UI at `/portfolio`: lot CRUD, fresh quote evidence, market filter, partial coverage and matched-cost P&L, and re-watch action for retained unwatched holdings. Cached reload never refreshes a provider. Successful writes remain acknowledged if a subsequent reload fails. Desktop/mobile workflows and overlapping-load regressions are covered.
@@ -52,6 +56,8 @@
 Recent commits:
 
 ```txt
+a3496c5 feat(dashboard): compare cached watchlist price movements
+869dd70 docs: record portfolio merge and next milestone work
 82f8630 Merge pull request #5 from Roman-Faria1/feat/v0-3-portfolio
 fe35713 fix(portfolio): ignore superseded dashboard loads
 50d8c17 docs: record alerts draft pull request
@@ -175,6 +181,8 @@ server before building/testing the production web output, since both use `.next`
 
 Validated recently:
 
+- Market overview, October 19, 2026: 179 unit/API/integration tests (29 Postgres tests plus one Redis scheduler test) and 20 Chromium desktop/mobile tests pass. Typecheck, lint, formatting, and production build pass. Coverage includes no-lookahead cutoffs, 24h baseline-lag boundaries, seven-day history, same-provider pairs, deterministic snapshot ties, null-price evidence, zero/missing/stale/unknown baselines, exact-ratio ranking before rounding, cache failures, filter races, and watchlist refresh invalidation. Screenshots inspected at desktop/mobile widths. No CS2Cap requests or scheduler changes.
+- Live overview smoke: both 24h and 7d endpoints return HTTP 200 with 12 watched, 0 comparable, and 12 unavailable from the existing local cache; no prices were refreshed. This is expected stale/insufficient evidence, not a flat market. The updated dashboard returns HTTP 200 and is running at `http://localhost:3000` with API on 4000.
 - Portfolio slice, October 17, 2026: 143 unit/API/integration tests passed, including 23 Postgres tests and one real Redis scheduler test. Six Chromium tests passed (watchlist, alerts, portfolio on desktop/mobile). Typecheck, lint, formatting and production build pass. Portfolio tests cover exact/large totals, unknown and zero costs, stale/missing/future source data, provider filters, matched-cost P&L, CRUD persistence, concurrent capacity protection, unwatched retention, API errors, and write-success/read-failure recovery. No provider quota used.
 - Final app/API smoke passed: `GET http://localhost:4000/portfolio` returns five cached market choices and a valid empty portfolio; `http://localhost:3000/portfolio` returns HTTP 200. Production web/API are running locally on 3000/4000; no worker started and no real holdings were inserted during verification.
 - v0.3 alert slice, October 17, 2026: 109 unit/API/integration tests passed, including 17 Postgres tests and one real Redis scheduler test. Four Chromium browser tests passed (watchlist + alert lifecycle on desktop/mobile). Typecheck, lint, format, production build, and live cached alert/history API smoke checks passed. Screenshots inspected; no real CS2Cap requests made.
@@ -197,8 +205,8 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 
 ## Next Recommended Work
 
-1. Next product slice: dashboard movement summary and biggest movers using saved history. Confirm the comparison window, provider matching, and data-quality rules before implementation. Do not mark the full v0.3 milestone complete yet.
-2. Alerts PR #4 and portfolio PR #5 are merged. This docs-only follow-up remains local/unpushed; include it in the next approved branch/PR rather than committing directly to main. Hosted validation remains outstanding.
+1. Review `feat/v0-3-market-overview` and publish a draft PR against main when requested. The local merge-handoff commit is included. No new migration is needed. Expect unavailable movement until enough fresh, same-provider historical snapshots exist; do not spend provider quota solely to fill the overview.
+2. After review/merge, confirm v0.3 release gates and decide release tagging/versioning. Then begin v0.4 private hosting preparations: auth gate first, deployment secrets/configuration, backups/migrations, and smoke checks. Hosted validation remains outstanding; do not expose the current unauthenticated API publicly.
 3. Keep cached valuation/alert evaluation independent of provider calls and use fixtures. A dedicated stale-check timer and external notifications are future follow-ups; automatic collection remains disabled until deliberately configured.
 4. Before hosted access, complete the v0.4 auth gate and secret/deployment configuration. The default watchlist remains single-user and the ordinary app API is not authenticated.
 

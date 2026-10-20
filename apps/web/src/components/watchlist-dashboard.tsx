@@ -6,6 +6,7 @@ import type { PriceSnapshot, Watchlist } from "@csst/shared";
 import { getRefreshStatusMessage } from "../lib/refresh-status";
 import { getFreshnessLabel, getLatestSnapshotsByProvider } from "../lib/snapshots";
 import { parseWatchlistFile } from "../lib/watchlist-transfer";
+import { MarketOverview } from "./market-overview";
 
 import {
   addWatchlistItem,
@@ -21,6 +22,7 @@ export function WatchlistDashboard() {
   const [marketHashName, setMarketHashName] = useState("");
   const [status, setStatus] = useState("Loading watchlist...");
   const [isBusy, setIsBusy] = useState(false);
+  const [overviewRevision, setOverviewRevision] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const itemCount = watchlist?.items.length ?? 0;
@@ -32,6 +34,7 @@ export function WatchlistDashboard() {
   async function loadWatchlist(nextStatus = "") {
     const nextWatchlist = await fetchWatchlist();
     setWatchlist(nextWatchlist);
+    setOverviewRevision((value) => value + 1);
     setStatus(nextStatus);
   }
 
@@ -129,17 +132,17 @@ export function WatchlistDashboard() {
       <div className="shell">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Personal MVP</p>
+            <p className="eyebrow">Market Monitor</p>
             <h1>CS Skin Tracker</h1>
-            <p className="subtitle">
-              Watchlist pricing, provider snapshots, and request-budget-aware refreshes.
-            </p>
+            <p className="subtitle">USD Listing Prices</p>
           </div>
           <div className="toolbar">
             <span className="muted">{itemCount} watched</span>
             <span className="muted">{snapshotCount} snapshots</span>
           </div>
         </header>
+
+        {watchlist !== null && <MarketOverview revision={overviewRevision} />}
 
         <form className="form" onSubmit={(event) => void handleAdd(event)}>
           <input

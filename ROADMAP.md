@@ -43,7 +43,7 @@
 - [x] Portfolio holding lots: quantity, optional per-skin acquisition cost, notes, CRUD.
 - [x] Cached portfolio valuation with provider selection, coverage labels, and matched-cost P&L.
 - [x] Persisted in-app alert history with immutable evidence and pagination.
-- [ ] Dashboard movement summary and biggest movers.
+- [x] Cached 24h/7d movement summary, same-market biggest movers, comparison evidence, and portfolio overview.
 
 ## v0.4 - Hosted Private Beta
 
