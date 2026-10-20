@@ -3,13 +3,13 @@
 ## Current State
 
 - Repo: `https://github.com/Roman-Faria1/cs-skin-tracker.git`
-- Current branch: `feat/v0-3-market-overview`, published with draft PR #6 against main: `https://github.com/Roman-Faria1/cs-skin-tracker/pull/6`. Dashboard summary and fixes for all three initial Copilot findings are implemented and locally verified; follow-up CI/re-review remain before merge. The prior local merge-handoff commit `869dd70` is included.
-- Latest merged main commit: `82f8630` (PR #5, portfolio). Local main is synchronized with origin/main. Portfolio and alerts feature branches are deleted locally/remotely; stale remote-tracking refs were pruned.
+- Current branch: `docs/market-overview-merge-handoff`, a local documentation-only follow-up to merged PR #6: `https://github.com/Roman-Faria1/cs-skin-tracker/pull/6`. No new product work started.
+- Latest merged main commit: `fd6ba08` (PR #6, market overview). Local main is synchronized with origin/main. The merged market-overview feature branch and older `docs/portfolio-merge-handoff` branch are deleted locally; deleted remote feature refs were pruned. Final review-fix CI on `e2ae96e` passed.
 - Main stack: TypeScript, pnpm workspaces, Next.js, NestJS/Fastify, Drizzle, Postgres, Redis/BullMQ.
 - Data provider: CS2Cap free-tier live prices via `GET https://api.cs2c.app/v1/prices`.
 - v0.1 is effectively complete for personal MVP usage.
 - v0.2 reliability, integration/CI coverage, opt-in scheduled collection, and watchlist transfer are merged.
-- v0.3 alerts, portfolio lots, and cached valuation are merged. Dashboard movement summary/biggest movers are implemented on this branch; review/merge remain before closing the milestone. Single-user auth, timer/notifications, and real-provider end-to-end coverage remain known limitations.
+- v0.3 alerts, portfolio lots, cached valuation, and dashboard movement summary/biggest movers are merged. All listed v0.3 feature TODOs are checked; release-gate confirmation and a tagging/versioning decision remain. Package versions are still `0.0.0`; do not infer a published release from milestone completion. Auth, standalone alert timer/external notifications, and real-provider end-to-end coverage remain known limitations.
 - Market overview scope: cache-only 24h (default) / 7d comparison, optional market filter, top five gainers/decliners, comparison coverage/evidence, and cached portfolio summary. Select each item's lowest fresh current ask, then compare only the SAME provider against its latest collected snapshot at/before the cutoff (up to 24h earlier). No cross-market price jumps, stale/unknown/future evidence, zero baselines, or non-advancing source dates in rankings. Missing evidence is unavailable, not flat. This is an approximate cutoff comparison; actual source/collection dates remain visible.
 - Movement API: `GET /dashboard/movement?window=24h&providerId=steam`; defaults to 24h/all markets. Strict query validation; unknown providers return 400. Queries use the existing snapshot index in a read-only repeatable-read transaction; no migration needed. Latest null-price/unknown-source rows are not replaced with older usable rows. No saved baseline in range means insufficient history; no interpolation or forward-looking baseline. Comparison source times must advance.
 - Ranking uses exact integer-cent ratios, with deterministic name/UUID tie-breaks, before display rounding. Flat is based on unchanged cents, not rounded percent. Small nonzero percentages display as `<0.01%` with direction preserved. API dollar deltas are decimal strings; source unit asks remain numbers consistent with existing snapshots.
@@ -47,7 +47,7 @@
 
 ## PR #6 Review Follow-Up
 
-- PR: `https://github.com/Roman-Faria1/cs-skin-tracker/pull/6`, still draft. All three initial Copilot findings are valid and addressed; leave review threads open for re-review rather than treating local fixes as reviewer approval.
+- PR: `https://github.com/Roman-Faria1/cs-skin-tracker/pull/6`, merged into main as `fd6ba08` (October 19, 2026, America/New_York). All three initial Copilot findings were addressed in `e2ae96e`; its final CI passed. Merge confirmed through GitHub and local main fast-forwarded; no review threads were automatically resolved by the agent.
 - Invalid cached asks: classify raw evidence before normalizing negative/nonfinite monetary fields and invalid volumes to null in movement responses. Preserve `invalid_current` / `invalid_baseline`, source timestamps, healthy items, and original stored snapshots. No shared contract relaxation or migration. Unit tests cover negative/NaN/infinite asks and invalid ancillary fields; a Postgres regression covers negative current/baseline asks alongside a healthy item.
 - Independent reads: movement and portfolio publish results/errors as soon as each settles, with separate loading state and version-guarded handlers/finalizers. Aggregate busy state only describes the overall section. Browser tests hold either endpoint pending while the other succeeds, fails, or returns empty movement, and verify completed sections do not retain loading labels.
 - Mutation invalidation: bump overview revision before awaiting the watchlist GET after successful add/remove/import/refresh. All four browser regressions fail that GET and release an obsolete pre-write movement response after the newer overview loads; the newer data remains visible.
@@ -64,6 +64,8 @@
 Recent commits:
 
 ```txt
+fd6ba08 Merge pull request #6 from Roman-Faria1/feat/v0-3-market-overview
+e2ae96e fix(dashboard): address market overview review findings
 a3496c5 feat(dashboard): compare cached watchlist price movements
 869dd70 docs: record portfolio merge and next milestone work
 82f8630 Merge pull request #5 from Roman-Faria1/feat/v0-3-portfolio
@@ -214,8 +216,8 @@ Seeded rows: 12 items, 6 providers, 12 watched items
 
 ## Next Recommended Work
 
-1. Request follow-up review of market-overview draft PR #6 and confirm CI on the review-fix commit before marking it ready or merging. All three initial Copilot findings have fixes and regression tests; reviewer threads intentionally remain open for re-review. No new migration is needed. Expect unavailable movement until enough fresh, same-provider historical snapshots exist; do not spend provider quota solely to fill the overview.
-2. After review/merge, confirm v0.3 release gates and decide release tagging/versioning. Then begin v0.4 private hosting preparations: auth gate first, deployment secrets/configuration, backups/migrations, and smoke checks. Hosted validation remains outstanding; do not expose the current unauthenticated API publicly.
+1. Confirm v0.3 release gates against merged main and decide release tagging/versioning. All feature TODOs are checked, but package versions remain `0.0.0` and no release tag was created during merge cleanup. Expect unavailable movement until enough fresh, same-provider historical snapshots exist; do not spend provider quota solely to fill the overview.
+2. Begin v0.4 private hosting preparations on a new feature branch: auth gate first, then deployment secrets/configuration, backups/migrations, and deployed smoke checks. Choose the private-access identity/session approach before implementation. Hosted validation remains outstanding; do not expose the current unauthenticated API publicly or mistake a frontend-only login for API protection.
 3. Keep cached valuation/alert evaluation independent of provider calls and use fixtures. A dedicated stale-check timer and external notifications are future follow-ups; automatic collection remains disabled until deliberately configured.
 4. Before hosted access, complete the v0.4 auth gate and secret/deployment configuration. The default watchlist remains single-user and the ordinary app API is not authenticated.
 
