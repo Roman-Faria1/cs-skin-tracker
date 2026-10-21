@@ -2,7 +2,13 @@ import type { NextConfig } from "next";
 import { loadEnvConfig } from "@next/env";
 import { resolve } from "node:path";
 
-loadEnvConfig(resolve(process.cwd(), "../.."), process.env.NODE_ENV === "development");
+// Next has already cached an app-directory lookup; reload to include the workspace .env.
+loadEnvConfig(
+  resolve(process.cwd(), "../.."),
+  process.env.NODE_ENV === "development",
+  console,
+  true
+);
 
 type WebpackConfig = {
   resolve?: {
