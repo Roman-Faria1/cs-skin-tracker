@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { loadApiEnv } from "../config/env.js";
 import { WatchlistsService } from "./watchlists.service.js";
+import { OwnerAuthExempt } from "../auth/auth.guard.js";
 
 export function authorizeSyncRequest(authorization: string | undefined, token: string): void {
   if (!token) throw new NotFoundException();
@@ -23,6 +24,7 @@ export class InternalSyncController {
   constructor(@Inject(WatchlistsService) private readonly watchlists: WatchlistsService) {}
 
   @Post("sync")
+  @OwnerAuthExempt()
   sync(@Headers("authorization") authorization?: string) {
     authorizeSyncRequest(authorization, loadApiEnv().internalSyncToken);
     return this.watchlists.refresh();

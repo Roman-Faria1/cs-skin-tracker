@@ -28,8 +28,8 @@ for (const [held, result] of [
     const pending = new Promise<void>((resolve) => {
       release = resolve;
     });
-    await page.route("http://localhost:4000/**", async (route) => {
-      const path = new URL(route.request().url()).pathname;
+    await page.route("**/api/**", async (route) => {
+      const path = new URL(route.request().url()).pathname.slice(4);
       const endpoint = path === "/portfolio" ? "portfolio" : "movement";
       if (path === "/portfolio" || path === "/dashboard/movement") {
         if (endpoint === held) await pending;
@@ -112,8 +112,8 @@ for (const action of ["add", "remove", "import", "refresh"] as const) {
     riser.current.lowestAsk = 40;
     riser.changeUsd = "30.00";
     riser.changePercent = 300;
-    await page.route("http://localhost:4000/**", async (route) => {
-      const path = new URL(route.request().url()).pathname;
+    await page.route("**/api/**", async (route) => {
+      const path = new URL(route.request().url()).pathname.slice(4);
       const method = route.request().method();
       if (method === "OPTIONS") {
         await route.fulfill({

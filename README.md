@@ -21,6 +21,13 @@ Professional-grade personal dashboard for tracking CS2 skin prices, trends, and 
 6. Seed common providers and starter watchlist items: `corepack pnpm db:seed`
 7. Start API and web apps: `corepack pnpm dev`
 
+Local scripts bind to loopback. Before hosting, configure the private owner auth gate for
+both web and API using [the authentication setup guide](docs/private-auth.md). Browser data
+requests now use the same-origin `/api` proxy; `API_BASE_URL` is server-only and
+`NEXT_PUBLIC_API_BASE_URL` is no longer used. Authentication is disabled by default for local
+development; production requires it or an explicit local-only preview bypass. Never enable
+that bypass on a hosted environment.
+
 Scheduled collection is opt-in. Set `SYNC_ENABLED=true` and configure the same
 `INTERNAL_SYNC_TOKEN` (at least 32 random characters) on the API and worker, then run
 `corepack pnpm dev:worker` alongside the API. The worker loads the root `.env`.

@@ -35,10 +35,8 @@ test("watchlist transfer, skipped refreshes, and source freshness", async ({ pag
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   let imports = 0;
-  await page.route("http://localhost:4000/portfolio**", (route) =>
-    route.fulfill({ json: emptyPortfolio })
-  );
-  await page.route("http://localhost:4000/dashboard/movement**", (route) =>
+  await page.route("**/api/portfolio**", (route) => route.fulfill({ json: emptyPortfolio }));
+  await page.route("**/api/dashboard/movement**", (route) =>
     route.fulfill({
       json: {
         ...movementFixture(),
@@ -61,7 +59,7 @@ test("watchlist transfer, skipped refreshes, and source freshness", async ({ pag
       }
     })
   );
-  await page.route("**/watchlists/default**", async (route) => {
+  await page.route("**/api/watchlists/default**", async (route) => {
     if (route.request().method() === "OPTIONS") {
       await route.fulfill({
         status: 204,
@@ -73,7 +71,7 @@ test("watchlist transfer, skipped refreshes, and source freshness", async ({ pag
       });
       return;
     }
-    const path = new URL(route.request().url()).pathname;
+    const path = new URL(route.request().url()).pathname.slice(4);
     if (path.endsWith("/import")) {
       imports += 1;
       expect(route.request().postDataJSON()).toEqual(transfer);

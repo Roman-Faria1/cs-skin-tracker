@@ -38,6 +38,9 @@
 
 ## v0.3 - Alerts & Portfolio Features
 
+Release gates confirmed October 21, 2026; see [milestone record](docs/releases/v0.3.md).
+No release tag or package version bump has been made.
+
 - [x] Initial `alerts` and `portfolio_items` schema.
 - [x] Cached alert rule evaluation, pause/resume/rearm, and refresh integration.
 - [x] Portfolio holding lots: quantity, optional per-skin acquisition cost, notes, CRUD.
@@ -48,7 +51,8 @@
 ## v0.4 - Hosted Private Beta
 
 - [ ] Deployment docs.
-- [ ] Auth gate.
+- [x] Private owner auth gate for web and API, with Supabase sessions and server-only data access.
+- [ ] Verify real Supabase owner login, production cookie settings, and hosted access.
 - [ ] Structured logging and error reporting.
 - [ ] Backup/migration workflow.
 

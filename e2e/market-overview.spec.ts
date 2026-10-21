@@ -26,7 +26,7 @@ test("market overview filters, coverage, cached refresh and independent failures
   let failMovement = false;
   let failPortfolio = false;
   let refreshes = 0;
-  await page.route("http://localhost:4000/**", async (route) => {
+  await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
     if (route.request().method() === "OPTIONS") {
       await route.fulfill({
@@ -39,7 +39,7 @@ test("market overview filters, coverage, cached refresh and independent failures
       });
       return;
     }
-    if (url.pathname === "/dashboard/movement") {
+    if (url.pathname === "/api/dashboard/movement") {
       queries.push(url.search);
       if (failMovement) {
         await route.fulfill({ status: 503, json: { message: "Movement cache offline" } });
@@ -53,7 +53,7 @@ test("market overview filters, coverage, cached refresh and independent failures
       });
       return;
     }
-    if (url.pathname === "/portfolio") {
+    if (url.pathname === "/api/portfolio") {
       await route.fulfill(
         failPortfolio
           ? { status: 503, json: { message: "Portfolio cache offline" } }
@@ -131,13 +131,13 @@ for (const obsoleteFailure of [false, true]) {
       release = resolve;
     });
     let reads = 0;
-    await page.route("http://localhost:4000/**", async (route) => {
+    await page.route("**/api/**", async (route) => {
       const url = new URL(route.request().url());
-      if (url.pathname === "/portfolio") {
+      if (url.pathname === "/api/portfolio") {
         await route.fulfill({ json: emptyPortfolio });
         return;
       }
-      if (url.pathname === "/dashboard/movement") {
+      if (url.pathname === "/api/dashboard/movement") {
         const revision = ++reads;
         if (revision === 1) {
           await initial;

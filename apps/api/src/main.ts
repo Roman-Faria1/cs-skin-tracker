@@ -18,7 +18,7 @@ async function bootstrap() {
     credentials: true
   });
 
-  await app.listen(env.port, "0.0.0.0");
+  await app.listen(env.port, env.auth.enabled ? "0.0.0.0" : "127.0.0.1");
 }
 
 void bootstrap();

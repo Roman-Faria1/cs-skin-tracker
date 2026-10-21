@@ -43,9 +43,9 @@ test("alert lifecycle and retained evidence", async ({ page }, testInfo) => {
       }
     });
   });
-  await page.route("http://localhost:4000/alerts**", async (route) => {
+  await page.route("**/api/alerts**", async (route) => {
     const method = route.request().method();
-    const path = new URL(route.request().url()).pathname;
+    const path = new URL(route.request().url()).pathname.slice(4);
     if (method === "OPTIONS") {
       await route.fulfill({
         status: 204,

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { z } from "zod";
+import { loadAuthConfig } from "@csst/shared";
 
 loadDotEnv();
 
@@ -33,6 +34,7 @@ export function loadApiEnv() {
   const parsed = apiEnvSchema.parse(process.env);
 
   return {
+    auth: loadAuthConfig(process.env),
     port: parsed.API_PORT,
     webOrigin: parsed.WEB_ORIGIN,
     internalSyncToken: parsed.INTERNAL_SYNC_TOKEN,
