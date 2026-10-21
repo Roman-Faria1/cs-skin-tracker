@@ -24,7 +24,7 @@ import type { MovementWindow } from "@csst/shared";
 import type { WatchlistTransfer } from "@csst/shared";
 import { z } from "zod";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+const apiBaseUrl = "/api";
 
 export async function fetchMovement(window: MovementWindow, providerId: string | null = null) {
   const query = new URLSearchParams({ window });

@@ -38,7 +38,7 @@ export const items = pgTable(
       table.normalizedMarketHashName
     )
   })
-);
+).enableRLS();
 
 export const marketProviders = pgTable("market_providers", {
   id: text("id").primaryKey(),
@@ -47,14 +47,14 @@ export const marketProviders = pgTable("market_providers", {
   supportsBuyOrders: boolean("supports_buy_orders").default(false).notNull(),
   supportsSales: boolean("supports_sales").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
-});
+}).enableRLS();
 
 export const watchlists = pgTable("watchlists", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull().default("Default"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
-});
+}).enableRLS();
 
 export const watchlistItems = pgTable(
   "watchlist_items",
@@ -74,7 +74,7 @@ export const watchlistItems = pgTable(
       table.itemId
     )
   })
-);
+).enableRLS();
 
 export const priceSnapshots = pgTable(
   "price_snapshots",
@@ -105,7 +105,7 @@ export const priceSnapshots = pgTable(
       table.id.desc()
     )
   })
-);
+).enableRLS();
 
 export const syncRuns = pgTable(
   "sync_runs",
@@ -130,7 +130,7 @@ export const syncRuns = pgTable(
     budgetIdx: index("sync_runs_budget_idx").on(table.providerId, table.startedAt),
     cooldownIdx: index("sync_runs_cooldown_idx").on(table.providerId, table.itemId, table.startedAt)
   })
-);
+).enableRLS();
 
 export const alerts = pgTable("alerts", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -148,7 +148,7 @@ export const alerts = pgTable("alerts", {
   baselineSnapshot: jsonb("baseline_snapshot"),
   lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true }),
   lastEvaluation: text("last_evaluation")
-});
+}).enableRLS();
 
 export const alertEvents = pgTable(
   "alert_events",
@@ -173,7 +173,7 @@ export const alertEvents = pgTable(
     ),
     historyIdx: index("alert_events_history_idx").on(table.triggeredAt.desc(), table.id.desc())
   })
-);
+).enableRLS();
 
 export const portfolioItems = pgTable("portfolio_items", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -185,7 +185,7 @@ export const portfolioItems = pgTable("portfolio_items", {
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
-});
+}).enableRLS();
 
 export const itemsRelations = relations(items, ({ many }) => ({
   watchlistItems: many(watchlistItems),

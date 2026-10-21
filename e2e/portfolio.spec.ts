@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/owner-test";
 import type { Holding, HoldingInput, Portfolio, PriceSnapshot, ValuedHolding } from "@csst/shared";
 
 const itemId = "00000000-0000-4000-8000-000000000201";
@@ -102,7 +102,7 @@ for (const [lateResult, marketSettled] of [
         }
       });
     });
-    await page.route("http://localhost:4000/portfolio**", async (route) => {
+    await page.route("**/api/portfolio**", async (route) => {
       const revision = ++reads;
       if (revision === 1) {
         await initial;
@@ -142,7 +142,8 @@ for (const [lateResult, marketSettled] of [
         await expect(page.getByLabel("Valuation Market")).toHaveValue("steam");
       }
       const oldResponse = page.waitForResponse(
-        (response) => response.url() === "http://localhost:4000/portfolio"
+        (response) =>
+          new URL(response.url()).pathname === "/api/portfolio" && !new URL(response.url()).search
       );
       releaseInitial();
       await (await oldResponse).finished();
@@ -231,7 +232,7 @@ test("portfolio lots, partial valuation, providers and recoverable failures", as
       }
     });
   });
-  await page.route("http://localhost:4000/portfolio**", async (route) => {
+  await page.route("**/api/portfolio**", async (route) => {
     const method = route.request().method();
     const url = new URL(route.request().url());
     if (method === "OPTIONS") {

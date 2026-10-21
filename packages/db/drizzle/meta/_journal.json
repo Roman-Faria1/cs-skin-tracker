@@ -29,6 +29,13 @@
       "when": 1792286074185,
       "tag": "0003_alert_history",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792557788324,
+      "tag": "0004_private_api_rls",
+      "breakpoints": true
     }
   ]
 }
