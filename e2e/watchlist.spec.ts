@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/owner-test";
 import { emptyPortfolio, movementFixture } from "./fixtures/market-overview";
 
 const itemId = "00000000-0000-4000-8000-000000000201";

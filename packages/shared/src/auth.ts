@@ -21,10 +21,7 @@ const enabledAuthSchema = z.object({
 export function loadAuthConfig(env: Record<string, string | undefined>) {
   const enabled = z.enum(["true", "false"]).default("false").parse(env.AUTH_ENABLED) === "true";
   if (!enabled) {
-    if (env.NODE_ENV === "production" && env.ALLOW_LOCAL_AUTH_BYPASS !== "true")
-      throw new Error(
-        "Production requires AUTH_ENABLED=true; local runs need ALLOW_LOCAL_AUTH_BYPASS=true"
-      );
+    if (env.NODE_ENV === "production") throw new Error("Production requires AUTH_ENABLED=true");
     return { enabled: false as const };
   }
   const parsed = enabledAuthSchema.parse(env);

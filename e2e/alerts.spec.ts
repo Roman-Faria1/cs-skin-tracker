@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/owner-test";
 import type { AlertRule, AlertEvent } from "@csst/shared";
 
 const itemId = "00000000-0000-4000-8000-000000000201";

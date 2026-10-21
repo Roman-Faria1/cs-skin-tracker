@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/owner-test";
 import { emptyPortfolio, movementFixture } from "./fixtures/market-overview";
 
 const watchlist = {

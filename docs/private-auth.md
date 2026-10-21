@@ -38,7 +38,6 @@ service-role or secret API key is needed. Do not add blanket authenticated-user 
 
 ```env
 AUTH_ENABLED=true
-ALLOW_LOCAL_AUTH_BYPASS=false
 SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY
 PRIVATE_OWNER_USER_ID=YOUR_OWNER_USER_UUID
@@ -59,22 +58,25 @@ the root `.env`. Hosting must set matching auth/owner configuration on both serv
 For hosting, use the canonical HTTPS web origin exactly, without a path; cookies must
 be Secure and same-origin writes must match. Supabase URLs and web origins only allow
 HTTP on loopback. Configure trusted HTTPS proxy/host routing before exposing the app.
-Production refuses disabled authentication unless the explicit local-only bypass is set.
-Never set that bypass on a hosted environment. Local web scripts bind to loopback; a host
+Production always requires authentication; there is no production bypass. The former
+`ALLOW_LOCAL_AUTH_BYPASS` setting is ignored and cannot disable production auth.
+Local web scripts bind to loopback; a host
 must deliberately use a public bind, for example `pnpm --filter @csst/web exec next start
 -H 0.0.0.0 -p 3000`, with authentication enabled. The API binds publicly only with auth on.
 
 ## Local Unauthenticated Preview
 
 Development defaults to the existing local-only experience when auth is disabled.
-To preview a production build locally without Supabase configuration:
+To work locally without Supabase configuration, use the development servers:
 
 ```bash
-AUTH_ENABLED=false ALLOW_LOCAL_AUTH_BYPASS=true NODE_ENV=production corepack pnpm --parallel --filter @csst/api --filter @csst/web start
+AUTH_ENABLED=false NODE_ENV=development corepack pnpm dev
 ```
 
-This is a deliberate development bypass, not a private deployment. The normal scripts
-bind to loopback. Keep automatic collection disabled during auth setup and verification.
+The normal scripts bind to loopback. Production-build previews require configured owner
+authentication. Browser tests also run with auth enabled against a loopback-only fixture
+identity service; there is no test bypass in application code. Keep automatic collection
+disabled during auth setup and verification.
 
 ## Verification Before Hosting
 

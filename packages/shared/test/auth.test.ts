@@ -9,13 +9,26 @@ const configured = {
 };
 
 describe("private owner auth configuration", () => {
-  it("requires explicit auth or an explicit local bypass for production", () => {
+  it("requires authentication in production even with the former local bypass flag", () => {
     expect(() => loadAuthConfig({ NODE_ENV: "production" })).toThrow("Production requires");
     expect(() => loadAuthConfig({ NODE_ENV: "production", AUTH_ENABLED: "false" })).toThrow();
-    expect(loadAuthConfig({ NODE_ENV: "production", ALLOW_LOCAL_AUTH_BYPASS: "true" })).toEqual({
-      enabled: false
-    });
+    for (const origin of [undefined, "http://localhost:3000", "https://tracker.example.com"]) {
+      for (const enabled of [undefined, "false"]) {
+        expect(() =>
+          loadAuthConfig({
+            NODE_ENV: "production",
+            AUTH_ENABLED: enabled,
+            ALLOW_LOCAL_AUTH_BYPASS: "true",
+            WEB_ORIGIN: origin
+          })
+        ).toThrow("Production requires AUTH_ENABLED=true");
+      }
+    }
+    expect(loadAuthConfig({ ...configured, NODE_ENV: "production" }).enabled).toBe(true);
+  });
+  it("allows unauthenticated local development and unit tests", () => {
     expect(loadAuthConfig({ NODE_ENV: "development" })).toEqual({ enabled: false });
+    expect(loadAuthConfig({ NODE_ENV: "test" })).toEqual({ enabled: false });
   });
   it("does not interpret false-looking strings as true", () => {
     expect(loadAuthConfig({ AUTH_ENABLED: "false" })).toEqual({ enabled: false });
