@@ -78,6 +78,9 @@ bind to loopback. Keep automatic collection disabled during auth setup and verif
 
 ## Verification Before Hosting
 
+Local verification, October 21, 2026: the owner reports successful login and logout
+against the real Supabase project. This does not complete the hosted checklist below.
+
 - [ ] Owner can sign in against the real Supabase project and load cached data.
 - [ ] No cookies redirects protected web paths to login; direct API reads/writes return 401.
 - [ ] Another valid project user cannot access any data; raw API bearer requests are checked.
